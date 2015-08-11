@@ -1,27 +1,27 @@
 {
     "connections": [
         {
-            "name": "esper",
+            "name": "DTG",
             "connection": {
-                "server": "irc.esper.net",
-                "port": 6667,
-                "ssl": false,
+                "server": "irc.snoonet.net",
+                "port": 6697,
+                "ssl": true,
                 "ignore_cert": true,
                 "password": ""
             },
-            "nick": "MyCloudBot",
-            "user": "cloudbot",
+            "nick": "NorthBot",
+            "user": "NorthBot",
             "avoid_notices": false,
             "channels": [
-                "#cloudbot",
-                "#cloudbot2"
+                "#destinythegame",
+                "#dtgcoding"
             ],
             "disabled_commands": [],
             "acls": {},
             "nickserv": {
-                "enabled": false,
-                "nickserv_password": "",
-                "nickserv_user": "",
+                "enabled": true,
+                "nickserv_password": "northbot",
+                "nickserv_user": "northbot",
                 "nickserv_name": "nickserv",
                 "nickserv_command": "IDENTIFY"
             },
@@ -43,8 +43,8 @@
                         "op"
                     ],
                     "users": [
-                        "examplea!user@example.com",
-                        "exampleb!user@example.com"
+                        "weylin!*@*",
+                        "avcables!*@*"
                     ]
                 },
                 "moderators": {
@@ -59,7 +59,7 @@
                 }
             },
             "plugins": {},
-            "command_prefix": "."
+            "command_prefix": "!"
         }
     ],
     "api_keys": {
@@ -85,11 +85,20 @@
     },
     "database": "sqlite:///cloudbot.db",
     "plugin_loading": {
-        "use_whitelist": false,
+        "use_whitelist": true,
         "blacklist": [
             "update"
         ],
-        "whitelist": []
+        "whitelist": [
+            "destiny"
+            "admin_bot"
+            "admin_channel"
+            "core_ctcp"
+            "core_misc"
+            "core_sieve"
+            "core_tracker"
+            "help"
+        ]
     },
     "web": {
       "enabled": false,
@@ -99,7 +108,7 @@
     },
     "reloading": {
         "config_reloading": true,
-        "plugin_reloading": false
+        "plugin_reloading": true
     },
     "logging": {
         "console_debug": false,
