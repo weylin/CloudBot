@@ -3,7 +3,7 @@
         {
             "name": "DTG",
             "connection": {
-                "server": "irc.snoonet.net",
+                "server": "irc.snoonet.org",
                 "port": 6697,
                 "ssl": true,
                 "ignore_cert": true,
@@ -14,7 +14,8 @@
             "avoid_notices": false,
             "channels": [
                 "#destinythegame",
-                "#dtgcoding"
+                "#dtgcoding",
+		"#weylin"
             ],
             "disabled_commands": [],
             "acls": {},
@@ -90,13 +91,13 @@
             "update"
         ],
         "whitelist": [
-            "destiny"
-            "admin_bot"
-            "admin_channel"
-            "core_ctcp"
-            "core_misc"
-            "core_sieve"
-            "core_tracker"
+            "destiny",
+            "admin_bot",
+            "admin_channel",
+            "core_ctcp",
+            "core_misc",
+            "core_sieve",
+            "core_tracker",
             "help"
         ]
     },
