@@ -3,9 +3,9 @@
         {
             "name": "esper",
             "connection": {
-                "server": "irc.esper.net",
-                "port": 6667,
-                "ssl": false,
+                "server": "irc.snoonet.org",
+                "port": 6697,
+                "ssl": true,
                 "ignore_cert": true,
                 "password": ""
             },
@@ -13,8 +13,9 @@
             "user": "cloudbot",
             "avoid_notices": false,
             "channels": [
-                "#cloudbot",
-                "#cloudbot2"
+                "#destinythegame",
+                "#dtgcoding",
+		        "#weylin"
             ],
             "disabled_commands": [],
             "acls": {},
@@ -101,7 +102,16 @@
         "blacklist": [
             "update"
         ],
-        "whitelist": []
+        "whitelist": [
+            "destiny",
+            "admin_bot",
+            "admin_channel",
+            "core_ctcp",
+            "core_misc",
+            "core_sieve",
+            "core_tracker",
+            "help"
+        ]
     },
     "web": {
         "enabled": false,
