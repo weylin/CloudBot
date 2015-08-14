@@ -86,10 +86,7 @@ def weekly(bot):
     else:
         return 'weylin lied to me, get good scrub.'
         
-#@hook.command('triumph')
-# Not yet working.
-# TypeError: 'int' object is not iterable. Line 123:
-# for membership in membershipType:
+@hook.command('triumph')
 def triumph(text, bot):
     api_key = bot.config.get("api_keys", {}).get("destiny", None)
     HEADERS = {"X-API-Key":api_key}
@@ -123,6 +120,7 @@ def triumph(text, bot):
  
     consoles = ['Xbox', 'Playstation']
     output = []
+    membershipType = [membershipType] if type(membershipType) == int else membershipType
     for membership in membershipType:
         triumphHash = requests.get(
             "https://www.bungie.net/platform/Destiny/{}/Account/{}/Triumphs/"
