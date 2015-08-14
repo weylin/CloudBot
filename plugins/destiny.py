@@ -86,11 +86,11 @@ def weekly(bot):
     else:
         return 'weylin lied to me, get good scrub.'
         
-@hook.command('triumph')
+
+ok.command('triumph')
 def triumph(text, bot):
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
-    
+    HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)} 
+
     triumphText = [
         '\x02Apprentice of Light\x02 (Max Level)',
         '\x02Light of the Garden\x02 (Main Story Complete)',
@@ -113,9 +113,9 @@ def triumph(text, bot):
  
     userHash = requests.get(
         "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
-        .format(str(userIDHash)),
+        .format(userIDHash),
         headers=HEADERS).json()['Response']['destinyAccounts'][0]['userInfo']
-    membershipType = str(userHash['membershipType'])
+    membershipType = userHash['membershipType']
     membershipId = userHash['membershipId']
  
     consoles = ['Xbox', 'Playstation']
@@ -136,12 +136,12 @@ def triumph(text, bot):
         if len(remaining) == 0:
             output.append(
                 "\x02{}\'s\x02 Year One Triumph is complete on {}!".format(
-                    userName, consoles[membership]))
+                    userName, consoles[membership - 1]))
         else:
             output.append(
                 "\x02{}\'s\x02 Year One Triumph is not complete on {}. "
                 "\x02Remaining task(s):\x02 {}".format(
-                    userName, consoles[membership], ', '.join(remaining)))
+                    userName, consoles[membership - 1], ', '.join(remaining)))
  
     return output
 
