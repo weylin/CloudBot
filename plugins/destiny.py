@@ -87,7 +87,7 @@ def weekly(bot):
         return 'weylin lied to me, get good scrub.'
         
 
-ok.command('triumph')
+@hook.command('triumph')
 def triumph(text, bot):
     HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)} 
 
