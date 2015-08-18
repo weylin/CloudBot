@@ -1,30 +1,79 @@
-import requests
 import json
-
 from cloudbot import hook
+from requests import get
+from pickle import dump, load
 
-classTypeName = {0: "Titan", 1: "Hunter", 2: "Warlock", 3:''}
+BASE_URL = 'https://www.bungie.net/platform/Destiny/'
+CLASS_TYPES = {0: "Titan", 1: "Hunter", 2: "Warlock", 3: ''}  # why is 3 here?
+CONSOLES = ['Xbox', 'Playstation']
+CACHE = {}
+HEADERS = {}
+
+
+def get_membership(user_name, bot):
+    """
+    Takes in a username and returns a dictionary of all systems they are
+    on as well as their associated id for that system
+    """
+    if CACHE.get(user_name, None):
+        return CACHE[user_name]
+    else:
+        userID = get(
+            "http://www.bungie.net/Platform/User/SearchUsers/?q={}"
+            .format(user_name.strip()),
+            headers=HEADERS).json()['Response'][0]
+        userIDHash = userID['membershipId']
+        userName = userID['displayName']
+
+        userHash = get(
+            "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
+            .format(userIDHash),
+            headers=HEADERS).json()['Response']['destinyAccounts']
+        membership = {}  # {console: memberId}
+        for result in userHash:
+            membership[result['userInfo']['membershipType']] = result['userInfo']['membershipId']
+        CACHE[userName] = membership
+        return membership
+
+
+@hook.on_start()
+def load_cache(bot):
+    """Load in our pickle cache and the Headers"""
+    global HEADERS
+    HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)}
+    try:
+        with open('destiny_cache', 'rb') as f:
+            global CACHE
+            CACHE = load(f)  # and the pickles!!!
+    except EOFError:
+        CACHE = {}
+
+
+@hook.command('save')
+def save_cache():
+    with open('destiny_cache', 'wb') as f:
+        dump(CACHE, f)
+        return "Cache saved"
+
 
 @hook.command('item')
 def item_search(text, bot):
-    """ Expects the tex to be a valid object in the Destiny database
-       Returns the item's name and description.
-       TODO: Implement error checking
-   """
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
-    
+    """
+    Expects the tex to be a valid object in the Destiny database
+    Returns the item's name and description.
+    TODO: Implement error checking
+    """
     item = text.strip()
-    itemquery = 'https://www.bungie.net/platform/Destiny/Explorer/Items?name=' + item
-    itemHash = requests.get(
-        itemquery, headers=HEADERS).json()['Response']['data']['itemHashes'];
- 
+    itemquery = '{}Explorer/Items?name={}'.format(BASE_URL, item)
+    itemHash = get(
+        itemquery, headers=HEADERS).json()['Response']['data']['itemHashes']
+
     output = []
-    for item in itemHash:        
-        itemquery = 'https://www.bungie.net/platform/Destiny/Manifest/inventoryItem/' + str(item)
-        result = requests.get(
-            itemquery, headers=HEADERS).json()['Response']['data']['inventoryItem'];
- 
+    for item in itemHash:
+        itemquery = '{}Manifest/inventoryItem/{}'.format(BASE_URL, item)
+        result = get(
+            itemquery, headers=HEADERS).json()['Response']['data']['inventoryItem']
+
         output.append('\x02{}\x02 ({} {} {}) - \x1D{}\x1D - http://www.destinydb.com/items/{}'.format(
             result['itemName'],
             result['tierTypeName'],
@@ -34,65 +83,68 @@ def item_search(text, bot):
             result['itemHash']
         ))
     return output[:3]
-    
+
+
 @hook.command('nightfall')
-def nightfall(bot):
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
- 
-    result = requests.get(
-        'https://www.bungie.net/platform/destiny/advisors/?definitions=true',
-        headers=HEADERS).json()
-    nightfallActivityId = str(result['Response']['data']['nightfallActivityHash'])
- 
-    result = requests.get(
-        'https://www.bungie.net/platform/destiny/manifest/activity/{}/?definitions=true'
-        .format(nightfallActivityId),
-        headers=HEADERS).json()
-    nightfallDefinition = result['Response']['data']['activity']
- 
-    if len(nightfallDefinition['skulls']) == 5:
-        return '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}, {}, {}, {}, {}'.format(
-            nightfallDefinition['activityName'],
-            nightfallDefinition['activityDescription'],
-            nightfallDefinition['skulls'][0]['displayName'],
-            nightfallDefinition['skulls'][1]['displayName'],
-            nightfallDefinition['skulls'][2]['displayName'],
-            nightfallDefinition['skulls'][3]['displayName'],
-            nightfallDefinition['skulls'][4]['displayName']
-        )
+def nightfall(text, bot):
+    if CACHE.get('nightfall', None) and not text.lower() == 'flush':
+        return CACHE['nightfall']
     else:
-        return 'weylin lied to me, get good scrub.'
+        nightfallActivityId = get(
+            '{}advisors/?definitions=true'.format(BASE_URL),
+            headers=HEADERS).json()['Response']['data']['nightfallActivityHash']
+
+        nightfallDefinition = get(
+            '{}manifest/activity/{}/?definitions=true'
+            .format(BASE_URL, nightfallActivityId),
+            headers=HEADERS).json()['Response']['data']['activity']
+
+        if len(nightfallDefinition['skulls']) == 5:
+            output = '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}, {}, {}, {}, {}'.format(
+                nightfallDefinition['activityName'],
+                nightfallDefinition['activityDescription'],
+                nightfallDefinition['skulls'][0]['displayName'],
+                nightfallDefinition['skulls'][1]['displayName'],
+                nightfallDefinition['skulls'][2]['displayName'],
+                nightfallDefinition['skulls'][3]['displayName'],
+                nightfallDefinition['skulls'][4]['displayName'],
+            )
+            CACHE['nightfall'] = output
+            return output
+        else:
+            return 'weylin lied to me, get good scrub.'
+
 
 @hook.command('weekly')
-def weekly(bot):
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
-    
-    weeklyHeroicId = requests.get(
-        'https://www.bungie.net/platform/destiny/advisors/?definitions=true',
-        headers=HEADERS).json()['Response']['data']['heroicStrike']['activityBundleHash']
- 
-    weeklyHeroicDefinition = requests.get(
-        'https://www.bungie.net/platform/destiny/manifest/activity/{}/?definitions=true'
-        .format(weeklyHeroicId),
-        headers=HEADERS).json()['Response']['data']['activity']
-    weeklyHeroicSkullIndex = weeklyHeroicDefinition['skulls']
- 
-    if len(weeklyHeroicSkullIndex) == 2:
-        return '\x02{}\x02 - \x1D{}\x1D \x02Modifier:\x02 {}'.format(
-            weeklyHeroicDefinition['activityName'],
-            weeklyHeroicDefinition['activityDescription'],
-            weeklyHeroicDefinition['skulls'][1]['displayName']
-        )
+def weekly(text, bot):
+    if CACHE.get('weekly', None) and not text.lower() == 'flush':
+        return CACHE['weekly']
     else:
-        return 'weylin lied to me, get good scrub.'
-        
+        weeklyHeroicId = get(
+            '{}advisors/?definitions=true'.format(BASE_URL),
+            headers=HEADERS
+        ).json()['Response']['data']['heroicStrike']['activityBundleHash']
+
+        weeklyHeroicDefinition = get(
+            '{}manifest/activity/{}/?definitions=true'
+            .format(BASE_URL, weeklyHeroicId),
+            headers=HEADERS).json()['Response']['data']['activity']
+        weeklyHeroicSkullIndex = weeklyHeroicDefinition['skulls']
+
+        if len(weeklyHeroicSkullIndex) == 2:
+            output = '\x02{}\x02 - \x1D{}\x1D \x02Modifier:\x02 {}'.format(
+                weeklyHeroicDefinition['activityName'],
+                weeklyHeroicDefinition['activityDescription'],
+                weeklyHeroicDefinition['skulls'][1]['displayName']
+            )
+            CACHE['weekly'] = output
+            return output
+        else:
+            return 'weylin lied to me, get good scrub.'
+
 
 @hook.command('triumph')
 def triumph(text, bot):
-    HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)} 
-
     triumphText = [
         '\x02Apprentice of Light\x02 (Max Level)',
         '\x02Light of the Garden\x02 (Main Story Complete)',
@@ -105,158 +157,83 @@ def triumph(text, bot):
         '\x02Crucible Gladiator\x02 (Win 100 Crucible Matches)',
         '\x02Chest Hunter\x02 (Found 20 Golden Chests)',
     ]
- 
-    userID = requests.get(
-        "http://www.bungie.net/Platform/User/SearchUsers/?q={}"
-        .format(text.strip()),
-        headers=HEADERS).json()['Response'][0]
-    userIDHash = userID['membershipId']
-    userName = userID['displayName']
- 
-    userHash = requests.get(
-        "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
-        .format(userIDHash),
-        headers=HEADERS).json()['Response']['destinyAccounts'][0]['userInfo']
-    membershipType = userHash['membershipType']
-    membershipId = userHash['membershipId']
- 
-    consoles = ['Xbox', 'Playstation']
+
+    membership = get_membership(text, bot)
     output = []
-    membershipType = [membershipType] if type(membershipType) == int else membershipType
-    for membership in membershipType:
-        triumphHash = requests.get(
-            "https://www.bungie.net/platform/Destiny/{}/Account/{}/Triumphs/"
-            .format(membership, membershipId),
+    for console in membership:
+        triumphHash = get(
+            "{}{}/Account/{}/Triumphs/"
+            .format(BASE_URL, console, membership[console]),
             headers=HEADERS
         ).json()['Response']['data']['triumphSets'][0]['triumphs']
- 
+
         remaining = []
         for i in range(10):
             if not triumphHash[i]['complete']:
                 remaining.append(triumphText[i])
- 
+
         if len(remaining) == 0:
             output.append(
                 "\x02{}\'s\x02 Year One Triumph is complete on {}!".format(
-                    userName, consoles[membership - 1]))
+                    text, CONSOLES[console - 1]))
         else:
             output.append(
                 "\x02{}\'s\x02 Year One Triumph is not complete on {}. "
                 "\x02Remaining task(s):\x02 {}".format(
-                    userName, consoles[membership - 1], ', '.join(remaining)))
- 
+                    text, CONSOLES[console - 1], ', '.join(remaining)))
+
     return output
+
 
 @hook.command('xur')
 def xur(text, bot):
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
+    if CACHE.get('xur', None) and not text.lower() == 'flush':
+        return CACHE['xur']
+    else:
+        xurStock = get(
+            "{}Advisors/Xur/?definitions=true".format(BASE_URL),
+            headers=HEADERS).json()['Response']
 
-    r = requests.get("https://www.bungie.net/platform/Destiny/Advisors/Xur/?definitions=true", headers=HEADERS);
+        hashes = xurStock['data']['saleItemCategories'][0]['saleItems']
+        text = xurStock['definitions']
+        exoticsHash = [hashes[i]['item'] for i in range(5)]
 
-    xurStock = r.json()
-
-    xurExoticHash0 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['itemHash'])
-
-    xurExoticName01 = str(xurStock['Response']['definitions']['items'][xurExoticHash0]['itemName'])
-
-    xurExoticStatHash01 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][1]['statHash'])
-    xurExoticStatName01 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash01]['statName'])
-    xurExoticStatValue01 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][1]['value'])
-
-
-    xurExoticStatHash02 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][2]['statHash'])
-    xurExoticStatName02 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash02]['statName'])
-    xurExoticStatValue02 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][2]['value'])
-
-
-    xurExoticStatHash03 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][3]['statHash'])
-    xurExoticStatName03 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash03]['statName'])
-    xurExoticStatValue03 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][0]['item']['stats'][3]['value'])
-
-
-    xurExoticStatName0 = xurStock['Response']['definitions']['stats'][xurExoticStatHash01]['statName']
-
-
-    xurExoticHash1 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['itemHash'])
-
-    xurExoticName11 = str(xurStock['Response']['definitions']['items'][xurExoticHash1]['itemName'])
-
-    xurExoticStatHash11 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][1]['statHash'])
-    xurExoticStatName11 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash11]['statName'])
-    xurExoticStatValue11 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][1]['value'])
-
-    xurExoticStatHash12 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][2]['statHash'])
-    xurExoticStatName12 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash12]['statName'])
-    xurExoticStatValue12 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][2]['value'])
-
-    xurExoticStatHash13 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][3]['statHash'])
-    xurExoticStatName13 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash13]['statName'])
-    xurExoticStatValue13 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][1]['item']['stats'][3]['value'])
-
-    xurExoticStatName1 = xurStock['Response']['definitions']['stats'][xurExoticStatHash11]['statName']
+        armor_list = []
+        for i in range(3):
+            exotic = '{} ({}: {}, {}: {}, {}: {})'.format(
+                text['items'][str(exoticsHash[i]['itemHash'])]['itemName'],
+                text['stats'][str(exoticsHash[i]['stats'][1]['statHash'])]['statName'][:3],
+                exoticsHash[i]['stats'][1]['value'],
+                text['stats'][str(exoticsHash[i]['stats'][2]['statHash'])]['statName'][:3],
+                exoticsHash[i]['stats'][2]['value'],
+                text['stats'][str(exoticsHash[i]['stats'][3]['statHash'])]['statName'][:3],
+                exoticsHash[i]['stats'][3]['value']
+            )
+            armor_list.append(exotic)
+        weapon = text['items'][str(exoticsHash[3]['itemHash'])]['itemName']
+        engram = text['items'][str(exoticsHash[4]['itemHash'])]['itemName']
+        output = '\x030,1 Armor \x030,14 {}; \x030,1 Weapon \x030,14 {}; \x030,1 Engram \x030,14 {}'.format(
+            ', '.join(armor_list), weapon, engram)
+        CACHE['xur'] = output
+        return output
 
 
-    xurExoticHash2 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['itemHash'])
+@hook.command('grim')
+def grim(text, bot):
+    membership = get_membership(text, bot)
+    output = []
+    for console in membership:
+        score = get(
+            "{}Vanguard/Grimoire/{}/{}/"
+            .format(BASE_URL, console, membership[console]),
+            headers=HEADERS
+        ).json()['Response']['data']['score']
+        output.append("{}'s grimoire score on the {} is {}.".format(
+            text, CONSOLES[console - 1], score))
 
-    xurExoticName21 = str(xurStock['Response']['definitions']['items'][xurExoticHash2]['itemName'])
-
-    xurExoticStatHash21 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][1]['statHash'])
-    xurExoticStatName21 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash21]['statName'])
-    xurExoticStatValue21 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][1]['value'])
-
-    xurExoticStatHash22 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][2]['statHash'])
-    xurExoticStatName22 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash22]['statName'])
-    xurExoticStatValue22 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][2]['value'])
-
-    xurExoticStatHash23 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][3]['statHash'])
-    xurExoticStatName23 = str(xurStock['Response']['definitions']['stats'][xurExoticStatHash23]['statName'])
-    xurExoticStatValue23 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][2]['item']['stats'][3]['value'])
-
-    xurExoticStatName2 = xurStock['Response']['definitions']['stats'][xurExoticStatHash21]['statName']
-
-    xurExoticHash3 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][3]['item']['itemHash'])
-    xurExoticName31 = str(xurStock['Response']['definitions']['items'][xurExoticHash3]['itemName'])
-
-    xurExoticHash4 = str(xurStock['Response']['data']['saleItemCategories'][0]['saleItems'][5]['item']['itemHash'])
-    xurExoticName41 = str(xurStock['Response']['definitions']['items'][xurExoticHash4]['itemTypeName'])
-
-    return '\x030,1 Armor \x030,14 ' + xurExoticName01 + ' (' + xurExoticStatName01[:3] + ': ' + xurExoticStatValue01 + ', ' + xurExoticStatName02[:3] + ': ' + xurExoticStatValue02 + ', ' + xurExoticStatName03[:3] + ': ' + xurExoticStatValue03 + ')' + ', ' + xurExoticName11 + ' (' + xurExoticStatName11[:3] + ': ' + xurExoticStatValue11 + ', ' + xurExoticStatName12[:3] + ': ' + xurExoticStatValue12 + ', ' + xurExoticStatName13[:3] + ': ' + xurExoticStatValue13 + ')' + ', ' + xurExoticName21 + ' (' + xurExoticStatName21[:3] + ': ' + xurExoticStatValue21 + ', ' + xurExoticStatName22[:3] + ': ' + xurExoticStatValue22 + ', ' + xurExoticStatName23[:3] + ': ' + xurExoticStatValue23 + ') ' + '\x030,1 Weapon \x030,14 ' + xurExoticName31 + ' \x030,1 Engram \x030,14 ' + xurExoticName41
-    
-@hook.command('xur2')
-def xur2(text, bot):
-    api_key = bot.config.get("api_keys", {}).get("destiny", None)
-    HEADERS = {"X-API-Key":api_key}
-
-    xurStock = get(
-        "https://www.bungie.net/platform/Destiny/Advisors/Xur/?definitions=true",
-        headers=HEADERS).json()['Response']
-
-    hashes = xurStock['data']['saleItemCategories'][0]['saleItems']
-    text = xurStock['definitions']
-    keys = [key for key in hashes]
-
-    armor_list = []
-    for i in range(3):
-        exotic = '{} ({}: {}, {}: {}, {}: {})'.format(
-            text['items'][hashes[keys[i]]['item']['itemHash']]['itemName'],
-            text['definitions']['stats'][hashes[keys[i]]['item']['stats'][1]['statHash']]['statName'][:3],
-            hashes[keys[i]]['item']['stats'][1]['value'],
-            text['definitions']['stats'][hashes[keys[i]]['item']['stats'][2]['statHash']]['statName'][:3],
-            hashes[keys[i]]['item']['stats'][2]['value'],
-            text['definitions']['stats'][hashes[keys[i]]['item']['stats'][3]['statHash']]['statName'][:3],
-            hashes[keys[i]]['item']['stats'][3]['value']
-        )
-        armor_list.append(exotic)
-    weapon = text['items'][hashes[keys[3]]['item']['itemHash']]['itemName']
-    engram = text['items'][hashes[keys[4]]['item']['itemHash']]['itemName']
-
-    return '\x030,1 Armor \x030,14 {}; \x030,1 Weapon \x030,14 {}; \x030,1 Engram \x030,14 {}'.format(
-        ', '.join(armor_list), weapon, engram) 
+    return output
 
 
-
-
-
-
-
+@hook.command('compare')
+def compare(text, bot):
+    return 'Do it your fucking self, lazy bastard!'
