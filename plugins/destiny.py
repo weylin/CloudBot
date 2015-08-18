@@ -52,12 +52,14 @@ def nightfall(bot):
     nightfallDefinition = result['Response']['data']['activity']
  
     if len(nightfallDefinition['skulls']) == 5:
-        return '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}, {}, {}'.format(
+        return '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}, {}, {}, {}, {}'.format(
             nightfallDefinition['activityName'],
             nightfallDefinition['activityDescription'],
+            nightfallDefinition['skulls'][0]['displayName'],
             nightfallDefinition['skulls'][1]['displayName'],
             nightfallDefinition['skulls'][2]['displayName'],
-            nightfallDefinition['skulls'][3]['displayName']
+            nightfallDefinition['skulls'][3]['displayName'],
+            nightfallDefinition['skulls'][4]['displayName']
         )
     else:
         return 'weylin lied to me, get good scrub.'
