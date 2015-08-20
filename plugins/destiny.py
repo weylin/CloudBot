@@ -1,7 +1,7 @@
 import json
 from cloudbot import hook
 from html.parser import HTMLParser
-from random import randint
+from random import randint, sample
 from requests import get
 from pickle import dump, load
 
@@ -54,6 +54,23 @@ def get_membership(user_name, bot):
         CACHE[userName] = membership
         return membership
 
+def prepare_lore_cache():
+    """
+   This function will allow us to do this: LORE_CACHE[name]['cardIntro']
+   """
+    lore_base = get("{}/Vanguard/Grimoire/Definition/".format(BASE_URL),
+        headers=HEADERS).json()['Response']['themeCollection']
+ 
+    global LORE_CACHE
+    LORE_CACHE = {}
+    for level1 in lore_base:
+        for level2 in level1['pageCollection']:
+            for card in level2['cardCollection']:
+                LORE_CACHE[card['cardName']] = {
+                    'cardIntro': card.get('cardIntro', ''),
+                    'cardDescription': card['cardDescription'],
+                    'cardId': card['cardId']
+                }
 
 @hook.on_start()
 def load_cache(bot):
@@ -247,25 +264,34 @@ def xur(text, bot):
         CACHE['xur'] = output
         return output
 
-
 @hook.command('lore')
-def lore(bot):
-    if not LORE_CACHE:
-        global LORE_CACHE
-        LORE_CACHE = get("{}/Vanguard/Grimoire/Definition/".format(BASE_URL),
-            headers=HEADERS).json()['Response']['themeCollection']
-    level1 = randint(1, len(LORE_CACHE)) - 1
-    level2 = randint(1, len(LORE_CACHE[level1]['pageCollection'])) - 1
-    level3 = randint(1, len(LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'])) - 1
-    card = LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'][level3]
+def lore(text, bot):
+    if not LORE_CACHE:  # if the cache doesn't exist, create it
+        prepare_lore_cache()
+ 
+    if not text:  # if we aren't searching, return a random card
+        name = sample(list(LORE_CACHE), 1)[0]
+    else:
+        matches = []
+        for name in LORE_CACHE:
+            if text.lower() in name.lower():
+                matches.append(name)
+        if len(matches) == 1:
+            name = matches[0]
+        elif len(matches) == 0:
+            return "I ain't found shit!"
+        else:
+            return ("Search too ambiguous, please be more specific "
+                   "(e.g. {}).".format(", ".join(matches[:3])))
+ 
+    contents = LORE_CACHE[name]  # get the actual card contents
     output = strip_tags("{}: {} - {}".format(
-            card['cardName'], card.get('cardIntro', ''), card['cardDescription']))
+            name, contents.get('cardIntro', ''), contents['cardDescription']))
     if len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
-            output[:301], card['cardId'])
-
+            output[:301], contents['cardId'])
+ 
     return output if len(output) > 5 else lore(bot)
-
 
 @hook.command('grim')
 def grim(text, bot):
