@@ -264,7 +264,7 @@ def lore(bot):
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
             output[:701], card['cardId'])
 
-    return output if len(output) > 5 else lore()
+    return output if len(output) > 5 else lore(bot)
 
 
 @hook.command('grim')
