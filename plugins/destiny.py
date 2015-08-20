@@ -27,7 +27,7 @@ class MLStripper(HTMLParser):
 def strip_tags(html):
     s = MLStripper()
     s.feed(html)
-    return s.get_data()
+    return s.get_data().replace('\n','\t')
 
 def get_membership(user_name, bot):
     """
@@ -258,9 +258,13 @@ def lore(bot):
     level2 = randint(1, len(LORE_CACHE[level1]['pageCollection'])) - 1
     level3 = randint(1, len(LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'])) - 1
     card = LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'][level3]
-
-    return strip_tags("{}: {} - {}".format(
+    output = strip_tags("{}: {} - {}".format(
             card['cardName'], card.get('cardIntro', ''), card['cardDescription']))
+    if len(output) > 700:
+        output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
+            output[:701], card['cardId'])
+
+    return output if len(output) > 5 else lore()
 
 
 @hook.command('grim')
@@ -277,6 +281,11 @@ def grim(text, bot):
             text, CONSOLES[console - 1], score))
 
     return output
+
+
+@hook.command('rules')
+def rules(bot):
+    return "Check 'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc"
 
 
 @hook.command('compare')
