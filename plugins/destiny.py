@@ -260,9 +260,9 @@ def lore(bot):
     card = LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'][level3]
     output = strip_tags("{}: {} - {}".format(
             card['cardName'], card.get('cardIntro', ''), card['cardDescription']))
-    if len(output) > 700:
+    if len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
-            output[:701], card['cardId'])
+            output[:301], card['cardId'])
 
     return output if len(output) > 5 else lore(bot)
 
