@@ -273,15 +273,18 @@ def lore(text, bot):
         name = sample(list(LORE_CACHE), 1)[0]
     else:
         matches = []
-        for name in LORE_CACHE:
-            if text.lower() in name.lower():
-                matches.append(name)
-        if len(matches) == 1:
-            name = matches[0]
-        elif len(matches) == 0:
-            return "I ain't found shit!"
-        else:
-            return ("Search too ambiguous, please be more specific "
+        for entry in LORE_CACHE:
+            if text.lower() in entry.lower():
+                name = entry
+            elif text.lower() in entry.lower():
+                matches.append(entry)
+        if not name:
+             if len(matches) == 1:
+                 name = matches[0]
+             elif len(matches) == 0:
+                 return "I ain't found shit!"
+             else:
+                 return ("Search too ambiguous, please be more specific "
                    "(e.g. {}).".format(", ".join(matches[:3])))
  
     contents = LORE_CACHE[name]  # get the actual card contents
