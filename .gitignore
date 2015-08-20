@@ -59,3 +59,4 @@ config.json
 *.mmdb
 *.log
 .idea/
+destiny_cache
