@@ -1,14 +1,33 @@
 import json
 from cloudbot import hook
+from html.parser import HTMLParser
+from random import randint
 from requests import get
 from pickle import dump, load
 
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
+CACHE = {}
 CLASS_TYPES = {0: "Titan", 1: "Hunter", 2: "Warlock", 3: ''}  # why is 3 here?
 CONSOLES = ['Xbox', 'Playstation']
-CACHE = {}
+LORE_CACHE = {}
 HEADERS = {}
 
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        self.reset()
+        self.strict = False
+        self.convert_charrefs= True
+        self.fed = []
+    def handle_data(self, d):
+        self.fed.append(d)
+    def get_data(self):
+        return ''.join(self.fed)
+
+def strip_tags(html):
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data()
 
 def get_membership(user_name, bot):
     """
@@ -47,13 +66,24 @@ def load_cache(bot):
             CACHE = load(f)  # and the pickles!!!
     except EOFError:
         CACHE = {}
+    try:
+        with open('lore_cache', 'rb') as f:
+            global LORE_CACHE
+            LORE_CACHE = load(f)  # and the pickles!!!
+    except EOFError:
+        LORE_CACHE = {}
 
 
 @hook.command('save')
 def save_cache():
+    output = 'Neither cache saved'
     with open('destiny_cache', 'wb') as f:
         dump(CACHE, f)
-        return "Cache saved"
+        output = ["Main cache saved"]
+    with open('lore_cache', 'wb') as f:
+        dump(CACHE, f)
+        output.append("Lore cache saved")
+    return output
 
 
 @hook.command('item')
@@ -216,6 +246,21 @@ def xur(text, bot):
             ', '.join(armor_list), weapon, engram)
         CACHE['xur'] = output
         return output
+
+
+@hook.command('lore')
+def lore(bot):
+    if not LORE_CACHE:
+        global LORE_CACHE
+        LORE_CACHE = get("{}/Vanguard/Grimoire/Definition/".format(BASE_URL),
+            headers=HEADERS).json()['Response']['themeCollection']
+    level1 = randint(1, len(LORE_CACHE)) - 1
+    level2 = randint(1, len(LORE_CACHE[level1]['pageCollection'])) - 1
+    level3 = randint(1, len(LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'])) - 1
+    card = LORE_CACHE[level1]['pageCollection'][level2]['cardCollection'][level3]
+
+    return strip_tags("{}: {} - {}".format(
+            card['cardName'], card.get('cardIntro', ''), card['cardDescription']))
 
 
 @hook.command('grim')
