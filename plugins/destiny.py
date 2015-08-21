@@ -263,11 +263,11 @@ def xur(text, bot):
         CACHE['xur'] = output
         return output
 
-@hook.command('lore')
-def lore(text, bot):
+@hook.command('lore') def lore(text, bot):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
         prepare_lore_cache()
  
+    name = ''
     if not text:  # if we aren't searching, return a random card
         name = sample(list(LORE_CACHE), 1)[0]
     else:
@@ -294,38 +294,6 @@ def lore(text, bot):
             output[:301], contents['cardId'])
  
     return output if len(output) > 5 else lore(bot)
-
-#@hook.command('lore')
-#def lore(text, bot):
-#    if not LORE_CACHE:  # if the cache doesn't exist, create it
-#        prepare_lore_cache()
-# 
-#    if not text:  # if we aren't searching, return a random card
-#        name = sample(list(LORE_CACHE), 1)[0]
-#    else:
-#        matches = []
-#        for entry in LORE_CACHE:
-#            if text.lower() in entry.lower():
-#                name = entry
-#            elif text.lower() in entry.lower():
-#                matches.append(entry)
-#        if not name:
-#             if len(matches) == 1:
-#                 name = matches[0]
-#             elif len(matches) == 0:
-#                 return "I ain't found shit!"
-#             else:
-#                 return ("Search too ambiguous, please be more specific "
-#                   "(e.g. {}).".format(", ".join(matches[:3])))
-# 
-#    contents = LORE_CACHE[name]  # get the actual card contents
-#    output = strip_tags("{}: {} - {}".format(
-#            name, contents.get('cardIntro', ''), contents['cardDescription']))
-#    if len(output) > 300:
-#        output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
-#            output[:301], contents['cardId'])
-# 
-#    return output if len(output) > 5 else lore(bot)
 
 @hook.command('grim')
 def grim(text, bot):
