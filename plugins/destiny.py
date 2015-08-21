@@ -263,7 +263,8 @@ def xur(text, bot):
         CACHE['xur'] = output
         return output
 
-@hook.command('lore') def lore(text, bot):
+@hook.command('lore') 
+def lore(text, bot):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
         prepare_lore_cache()
  
