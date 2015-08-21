@@ -231,7 +231,6 @@ def triumph(text, bot):
 
     return output
 
-
 @hook.command('xur')
 def xur(text, bot):
     if CACHE.get('xur', None) and not text.lower() == 'flush':
@@ -243,7 +242,7 @@ def xur(text, bot):
 
         hashes = xurStock['data']['saleItemCategories'][0]['saleItems']
         text = xurStock['definitions']
-        exoticsHash = [hashes[i]['item'] for i in range(5)]
+        exoticsHash = [hashes[i]['item'] for i in range(6)]
 
         armor_list = []
         for i in range(3):
@@ -258,8 +257,8 @@ def xur(text, bot):
             )
             armor_list.append(exotic)
         weapon = text['items'][str(exoticsHash[3]['itemHash'])]['itemName']
-        engram = text['items'][str(exoticsHash[4]['itemHash'])]['itemName']
-        output = '\x030,1 Armor \x030,14 {}; \x030,1 Weapon \x030,14 {}; \x030,1 Engram \x030,14 {}'.format(
+        engram = text['items'][str(exoticsHash[5]['itemHash'])]['itemName']
+        output = '\x02Armor\x02 {}; \x02Weapon\x02 {}; \x02Engram\x02 {}'.format(
             ', '.join(armor_list), weapon, engram)
         CACHE['xur'] = output
         return output
