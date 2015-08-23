@@ -26,8 +26,8 @@ def yahoo_finance_exchange(text):
 
     if len(text) < 3:
         return "<value> <type> <target currency(ies)> -- converts from one type to another"
-        
-    if text[2].lower() == "in":
+
+    if text[2].lower() == "IN":
         text.pop(2)
 
     try:
