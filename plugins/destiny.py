@@ -11,6 +11,13 @@ CLASS_TYPES = {0: "Titan", 1: "Hunter", 2: "Warlock", 3: ''}  # why is 3 here?
 CONSOLES = ['Xbox', 'Playstation']
 LORE_CACHE = {}
 HEADERS = {}
+CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x313Playstation\x02\x03']
+WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
+    'HandCannon', 'Machinegun', 'PulseRifle', 'RocketLauncher', 'ScoutRifle',
+    'Shotgun', 'Sniper', 'Submachinegun', 'Relic', 'SideArm']
+PVP_OPTS = ['assists', 'kills', 'deaths', 'k/d', 'bestSingleGameKills',
+    'bestSingleGameScore', 'bestWeapon', 'suicides', 'longestKillSpree',
+    'longestSingleLife', 'orbsDropped', 'zonesCaptured']
 
 
 class MLStripper(HTMLParser):
@@ -71,6 +78,17 @@ def prepare_lore_cache():
                     'cardDescription': card['cardDescription'],
                     'cardId': card['cardId']
                 }
+                
+def best_weapon(data):
+    best = None
+    weapon = None
+    for stat in data:
+        if "weaponKills" in stat:
+            if data[stat]['basic']['value'] > best:
+                best = data[stat]['basic']['value']
+                weapon = stat
+    return "{}: {} kills".format(
+        weapon[11:], round(best)) if best else "You ain't got no best weapon!"                
 
 @hook.on_start()
 def load_cache(bot):
@@ -320,3 +338,44 @@ def rules(bot):
 @hook.command('compare')
 def compare(text, bot):
     return 'Do it your fucking self, lazy bastard!'
+    
+@hook.command('pvp')
+def pvp(text, bot):
+    if not text:
+        return pvp('help', bot)
+    text = text.split(" ")
+    if text[0].lower() == 'help':
+        return 'options: {}'.format(", ".join(PVP_OPTS))
+    membership = get_membership(text[0], bot)
+    if type(membership) == str:
+        return membership
+    if len(text) == 1:  # if no stats are specified, add some
+        text.extend([
+            'k/d', 'bestSingleGameKills', 'longestKillSpree',
+            'longestSingleLife', 'orbsDropped', 'bestWeapon'])
+
+    output = []
+    for console in membership:
+        stats = get(
+            "{}Stats/Account/{}/{}/".format(
+                BASE_URL, console, membership[console]),
+            headers=HEADERS
+        ).json()['Response']['mergedAllCharacters']['results']['allPvP']['allTime']
+        tmp_out = []
+        for stat in text[1:]:
+            if stat in WEAPON_TYPES:
+                stat = "weaponKills{}".format(stat)
+            if stat in stats:
+                tmp_out.append('\x02{}\x02: {}'.format(
+                    stats[stat]['statId'], stats[stat]['basic']['displayValue']))
+            elif stat.lower() == 'k/d':
+                tmp_out.append('\x02k/d\x02: {}'.format(round(
+                    stats['kills']['basic']['value'] / stats['deaths']['basic']['value'], 2)))
+            elif stat == 'bestWeapon':
+                tmp_out.append('\x02bestWeapon\x02: {}'.format(best_weapon(stats)))
+            else:
+                tmp_out.append("Invalid option {}".format(stat))
+
+        output.append("{} - {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
+
+    return "; ".join(output)
