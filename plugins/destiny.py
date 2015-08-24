@@ -1,17 +1,22 @@
 import json
 from cloudbot import hook
 from html.parser import HTMLParser
-from random import randint, sample
+from random import sample
 from requests import get
 from pickle import dump, load
 
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
-CLASS_TYPES = {0: "Titan", 1: "Hunter", 2: "Warlock", 3: ''}  # why is 3 here?
-CONSOLES = ['Xbox', 'Playstation']
+CLASS_TYPES = {0: "Titan ", 1: "Hunter ", 2: "Warlock ", 3: ''}
+CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0313Playstation\x02\x03']
 LORE_CACHE = {}
 HEADERS = {}
-
+WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
+    'HandCannon', 'Machinegun', 'PulseRifle', 'RocketLauncher', 'ScoutRifle',
+    'Shotgun', 'Sniper', 'Submachinegun', 'Relic', 'SideArm']
+PVP_OPTS = ['assists', 'kills', 'deaths', 'k/d', 'bestSingleGameKills',
+    'bestSingleGameScore', 'bestWeapon', 'suicides', 'longestKillSpree',
+    'longestSingleLife', 'orbsDropped', 'zonesCaptured']
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -29,30 +34,34 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data().replace('\n','\t')
 
-def get_membership(user_name, bot):
+def get_membership(user_name):
     """
     Takes in a username and returns a dictionary of all systems they are
     on as well as their associated id for that system
     """
+    user_name = CACHE['links'].get(user_name, user_name)
     if CACHE.get(user_name, None):
         return CACHE[user_name]
     else:
-        userID = get(
-            "http://www.bungie.net/Platform/User/SearchUsers/?q={}"
-            .format(user_name.strip()),
-            headers=HEADERS).json()['Response'][0]
-        userIDHash = userID['membershipId']
-        userName = userID['displayName']
+        try:
+            userID = get(
+                "http://www.bungie.net/Platform/User/SearchUsers/?q={}".format(user_name.strip()),
+                headers=HEADERS).json()['Response'][0]
+            userIDHash = userID['membershipId']
+            userName = userID['displayName']
 
-        userHash = get(
+            userHash = get(
             "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
             .format(userIDHash),
             headers=HEADERS).json()['Response']['destinyAccounts']
+        except:
+            return "A user by the name {} was not found.".format(user_name)
+
         membership = {}  # {console: memberId}
         for result in userHash:
             membership[result['userInfo']['membershipType']] = result['userInfo']['membershipId']
         CACHE[userName] = membership
-        return membership
+        return membership if membership != {} else "A user by the name {} was not found.".format(user_name)
 
 def prepare_lore_cache():
     """
@@ -60,7 +69,7 @@ def prepare_lore_cache():
    """
     lore_base = get("{}/Vanguard/Grimoire/Definition/".format(BASE_URL),
         headers=HEADERS).json()['Response']['themeCollection']
- 
+
     global LORE_CACHE
     LORE_CACHE = {}
     for level1 in lore_base:
@@ -71,6 +80,18 @@ def prepare_lore_cache():
                     'cardDescription': card['cardDescription'],
                     'cardId': card['cardId']
                 }
+
+def best_weapon(data):
+    best = None
+    weapon = None
+    for stat in data:
+        if "weaponKills" in stat:
+            if data[stat]['basic']['value'] > best:
+                best = data[stat]['basic']['value']
+                weapon = stat
+    return "{}: {} kills".format(
+        weapon[11:], round(best)) if best else "You ain't got no best weapon!"
+
 
 @hook.on_start()
 def load_cache(bot):
@@ -83,6 +104,8 @@ def load_cache(bot):
             CACHE = load(f)  # and the pickles!!!
     except EOFError:
         CACHE = {}
+    if not CACHE.get('links'):
+        CACHE['links'] = {}
     try:
         with open('lore_cache', 'rb') as f:
             global LORE_CACHE
@@ -121,10 +144,10 @@ def item_search(text, bot):
         result = get(
             itemquery, headers=HEADERS).json()['Response']['data']['inventoryItem']
 
-        output.append('\x02{}\x02 ({} {} {}) - \x1D{}\x1D - http://www.destinydb.com/items/{}'.format(
+        output.append('\x02{}\x02 ({} {}{}) - \x1D{}\x1D - http://www.destinydb.com/items/{}'.format(
             result['itemName'],
             result['tierTypeName'],
-            result['classType'],
+            CLASS_TYPES[result['classType']],
             result['itemTypeName'],
             result.get('itemDescription', 'Item has no description.'),
             result['itemHash']
@@ -205,7 +228,9 @@ def triumph(text, bot):
         '\x02Chest Hunter\x02 (Found 20 Golden Chests)',
     ]
 
-    membership = get_membership(text, bot)
+    membership = get_membership(text)
+    if type(membership) == str:
+        return membership
     output = []
     for console in membership:
         triumphHash = get(
@@ -257,17 +282,17 @@ def xur(text, bot):
             )
             armor_list.append(exotic)
         weapon = text['items'][str(exoticsHash[3]['itemHash'])]['itemName']
-        engram = text['items'][str(exoticsHash[5]['itemHash'])]['itemName']
-        output = '\x02Armor\x02 {}; \x02Weapon\x02 {}; \x02Engram\x02 {}'.format(
+        engram = text['items'][str(exoticsHash[5]['itemHash'])]['itemTypeName']
+        output = '\x02Armor\x02 {} \x02Weapon\x02 {} \x02Engram\x02 {}'.format(
             ', '.join(armor_list), weapon, engram)
         CACHE['xur'] = output
         return output
 
-@hook.command('lore') 
+@hook.command('lore')
 def lore(text, bot):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
         prepare_lore_cache()
- 
+
     name = ''
     if not text:  # if we aren't searching, return a random card
         name = sample(list(LORE_CACHE), 1)[0]
@@ -279,26 +304,28 @@ def lore(text, bot):
             elif text.lower() in entry.lower():
                 matches.append(entry)
         if not name:
-             if len(matches) == 1:
-                 name = matches[0]
-             elif len(matches) == 0:
-                 return "I ain't found shit!"
-             else:
-                 return ("Search too ambiguous, please be more specific "
-                   "(e.g. {}).".format(", ".join(matches[:3])))
- 
+            if len(matches) == 1:
+                name = matches[0]
+            elif len(matches) == 0:
+                return "I ain't found shit!"
+            else:
+                return ("Search too ambiguous, please be more specific "
+                        "(e.g. {}).".format(", ".join(matches[:3])))
+
     contents = LORE_CACHE[name]  # get the actual card contents
     output = strip_tags("{}: {} - {}".format(
-            name, contents.get('cardIntro', ''), contents['cardDescription']))
+        name, contents.get('cardIntro', ''), contents['cardDescription']))
     if len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
             output[:301], contents['cardId'])
- 
-    return output if len(output) > 5 else lore(bot)
+
+    return output if len(output) > 5 else lore('', bot)
 
 @hook.command('grim')
 def grim(text, bot):
-    membership = get_membership(text, bot)
+    membership = get_membership(text)
+    if type(membership) == str:
+        return membership
     output = []
     for console in membership:
         score = get(
@@ -311,6 +338,58 @@ def grim(text, bot):
 
     return output
 
+
+@hook.command('pvp')
+def pvp(text, bot):
+    if not text:
+        return pvp('help', bot)
+    text = text.split(" ")
+    if text[0].lower() == 'help':
+        return 'options: {}'.format(", ".join(PVP_OPTS))
+    membership = get_membership(text[0])
+    if type(membership) == str:
+        return membership
+    if len(text) == 1:  # if no stats are specified, add some
+        text.extend([
+            'k/d', 'bestSingleGameKills', 'longestKillSpree',
+            'longestSingleLife', 'orbsDropped', 'bestWeapon'])
+
+    output = []
+    for console in membership:
+        stats = get(
+            "{}Stats/Account/{}/{}/".format(
+                BASE_URL, console, membership[console]),
+            headers=HEADERS
+        ).json()['Response']['mergedAllCharacters']['results']['allPvP']['allTime']
+        tmp_out = []
+        for stat in text[1:]:
+            if stat in WEAPON_TYPES:
+                stat = "weaponKills{}".format(stat)
+            if stat in stats:
+                tmp_out.append('\x02{}\x02: {}'.format(
+                    stats[stat]['statId'], stats[stat]['basic']['displayValue']))
+            elif stat.lower() == 'k/d':
+                tmp_out.append('\x02k/d\x02: {}'.format(round(
+                    stats['kills']['basic']['value'] / stats['deaths']['basic']['value'], 2)))
+            elif stat == 'bestWeapon':
+                tmp_out.append('\x02bestWeapon\x02: {}'.format(best_weapon(stats)))
+            else:
+                tmp_out.append("Invalid option {}".format(stat))
+
+        output.append("{} - {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
+
+    return "; ".join(output)
+
+
+@hook.command('link')
+def link(text, nick, bot):
+    text = text.split(" ")
+    if text[0].lower == 'flush':
+        CACHE['links'][text[1]] = ""
+        return "{} flushed".format(text[1])
+    else:
+        CACHE['links'][nick] = text[0]
+        return "{} linked to {}".format(text[0], nick)
 
 @hook.command('rules')
 def rules(bot):
