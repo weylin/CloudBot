@@ -399,3 +399,7 @@ def rules(bot):
 @hook.command('compare')
 def compare(text, bot):
     return 'Do it your fucking self, lazy bastard!'
+
+@hook.command('ping')
+def ping(text, bot):
+    return 'pong'
