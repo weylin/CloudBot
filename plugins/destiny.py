@@ -8,7 +8,7 @@ from pickle import dump, load
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
 CLASS_TYPES = {0: "Titan ", 1: "Hunter ", 2: "Warlock ", 3: ''}
-CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0313Playstation\x02\x03']
+CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0312Playstation\x02\x03']
 LORE_CACHE = {}
 HEADERS = {}
 WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
