@@ -82,7 +82,7 @@ def prepare_lore_cache():
                 }
 
 def best_weapon(data):
-    best = None
+    best = 0
     weapon = None
     for stat in data:
         if "weaponKills" in stat:
@@ -212,9 +212,9 @@ def weekly(text, bot):
         else:
             return 'weylin lied to me, get good scrub.'
 
-
 @hook.command('triumph')
-def triumph(text, bot):
+def triumph(text, nick, bot):
+    text = nick if not text else text
     triumphText = [
         '\x02Apprentice of Light\x02 (Max Level)',
         '\x02Light of the Garden\x02 (Main Story Complete)',
@@ -227,7 +227,6 @@ def triumph(text, bot):
         '\x02Crucible Gladiator\x02 (Win 100 Crucible Matches)',
         '\x02Chest Hunter\x02 (Found 20 Golden Chests)',
     ]
-
     membership = get_membership(text)
     if type(membership) == str:
         return membership
@@ -322,7 +321,8 @@ def lore(text, bot):
     return output if len(output) > 5 else lore('', bot)
 
 @hook.command('grim')
-def grim(text, bot):
+def grim(text, nick, bot):
+    text = nick if not text else text
     membership = get_membership(text)
     if type(membership) == str:
         return membership
@@ -340,12 +340,14 @@ def grim(text, bot):
 
 
 @hook.command('pvp')
-def pvp(text, bot):
+def pvp(text, nick, bot):
     if not text:
-        return pvp('help', bot)
+        text = nick
     text = text.split(" ")
     if text[0].lower() == 'help':
         return 'options: {}'.format(", ".join(PVP_OPTS))
+    elif text[0] in PVP_OPTS or text[0] in WEAPON_TYPES:
+        text = [nick] + text
     membership = get_membership(text[0])
     if type(membership) == str:
         return membership
