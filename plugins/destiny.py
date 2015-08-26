@@ -63,6 +63,45 @@ def get_membership(user_name):
         CACHE[userName] = membership
         return membership if membership != {} else "A user by the name {} was not found.".format(user_name)
 
+
+def get_user(user_name):
+    """
+    Takes in a username and returns a dictionary of all systems they are
+    on as well as their associated id for that system, plus general information
+    """
+    user_name = CACHE['links'].get(user_name, user_name)
+    if CACHE.get(user_name, None):
+        return CACHE[user_name]
+    else:
+        try:
+            userID = get(
+                "http://www.bungie.net/Platform/User/SearchUsers/?q={}".format(user_name.strip()),
+                headers=HEADERS).json()['Response'][0]
+            userHash = get(
+                "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
+                .format(userID['membershipId']),
+                headers=HEADERS).json()['Response']['destinyAccounts']
+        except:
+            return "A user by the name {} was not found.".format(user_name)
+
+        user_info = {}  #
+        for result in userHash:
+            character_dict = {}
+            for character in result['characters']:
+                character_dict[character['characterId']] = {
+                    'level': character['level'],
+                    'class': character['characterClass']['className']
+                }
+            user_dict = {
+                'membershipId': result['userInfo']['membershipId'],
+                'clan': result['clanName'],
+                'characters': character_dict
+            }
+            user_info[result['userInfo']['membershipType']] = user_dict
+
+        CACHE[userID['displayName']] = user_info
+        return user_info if user_info != {} else "A user by the name {} was not found.".format(user_name)
+
 def prepare_lore_cache():
     """
    This function will allow us to do this: LORE_CACHE[name]['cardIntro']
@@ -227,14 +266,14 @@ def triumph(text, nick, bot):
         '\x02Crucible Gladiator\x02 (Win 100 Crucible Matches)',
         '\x02Chest Hunter\x02 (Found 20 Golden Chests)',
     ]
-    membership = get_membership(text)
+    membership = get_user(text)
     if type(membership) == str:
         return membership
     output = []
     for console in membership:
         triumphHash = get(
             "{}{}/Account/{}/Triumphs/"
-            .format(BASE_URL, console, membership[console]),
+            .format(BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
         ).json()['Response']['data']['triumphSets'][0]['triumphs']
 
@@ -323,14 +362,14 @@ def lore(text, bot):
 @hook.command('grim')
 def grim(text, nick, bot):
     text = nick if not text else text
-    membership = get_membership(text)
+    membership = get_user(text)
     if type(membership) == str:
         return membership
     output = []
     for console in membership:
         score = get(
             "{}Vanguard/Grimoire/{}/{}/"
-            .format(BASE_URL, console, membership[console]),
+            .format(BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
         ).json()['Response']['data']['score']
         output.append("{}'s grimoire score on the {} is {}.".format(
@@ -348,7 +387,7 @@ def pvp(text, nick, bot):
         return 'options: {}'.format(", ".join(PVP_OPTS))
     elif text[0] in PVP_OPTS or text[0] in WEAPON_TYPES:
         text = [nick] + text
-    membership = get_membership(text[0])
+    membership = get_user(text[0])
     if type(membership) == str:
         return membership
     if len(text) == 1:  # if no stats are specified, add some
@@ -360,7 +399,7 @@ def pvp(text, nick, bot):
     for console in membership:
         stats = get(
             "{}Stats/Account/{}/{}/".format(
-                BASE_URL, console, membership[console]),
+                BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
         ).json()['Response']['mergedAllCharacters']['results']['allPvP']['allTime']
         tmp_out = []
@@ -392,6 +431,7 @@ def link(text, nick, bot):
     else:
         CACHE['links'][nick] = text[0]
         return "{} linked to {}".format(text[0], nick)
+
 
 @hook.command('rules')
 def rules(bot):
