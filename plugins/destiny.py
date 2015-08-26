@@ -94,7 +94,7 @@ def get_user(user_name):
                 }
             user_dict = {
                 'membershipId': result['userInfo']['membershipId'],
-                'clan': result['clanName'],
+                'clan': result.get('clanName', 'None'),
                 'characters': character_dict
             }
             user_info[result['userInfo']['membershipType']] = user_dict
@@ -432,6 +432,14 @@ def link(text, nick, bot):
         CACHE['links'][nick] = text[0]
         return "{} linked to {}".format(text[0], nick)
 
+@hook.command('migrate')
+def migrate(text, nick, bot):
+    if nick in ['weylin', 'avcables[PS4]', 'DoctorRaptorMD[XB1]']:
+        global CACHE
+        CACHE = {'links': CACHE['links']}
+        return "Sucessfully migrated! Now run the save command."
+    else:
+        return "Your light is not strong enough."
 
 @hook.command('rules')
 def rules(bot):
@@ -445,3 +453,5 @@ def compare(text, bot):
 @hook.command('ping')
 def ping(text, bot):
     return 'pong'
+
+
