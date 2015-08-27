@@ -34,35 +34,6 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data().replace('\n','\t')
 
-def get_membership(user_name):
-    """
-    Takes in a username and returns a dictionary of all systems they are
-    on as well as their associated id for that system
-    """
-    user_name = CACHE['links'].get(user_name, user_name)
-    if CACHE.get(user_name, None):
-        return CACHE[user_name]
-    else:
-        try:
-            userID = get(
-                "http://www.bungie.net/Platform/User/SearchUsers/?q={}".format(user_name.strip()),
-                headers=HEADERS).json()['Response'][0]
-            userIDHash = userID['membershipId']
-            userName = userID['displayName']
-
-            userHash = get(
-            "https://www.bungie.net/platform/User/GetBungieAccount/{}/254/"
-            .format(userIDHash),
-            headers=HEADERS).json()['Response']['destinyAccounts']
-        except:
-            return "A user by the name {} was not found.".format(user_name)
-
-        membership = {}  # {console: memberId}
-        for result in userHash:
-            membership[result['userInfo']['membershipType']] = result['userInfo']['membershipId']
-        CACHE[userName] = membership
-        return membership if membership != {} else "A user by the name {} was not found.".format(user_name)
-
 
 def get_user(user_name):
     """
@@ -130,6 +101,20 @@ def best_weapon(data):
                 weapon = stat
     return "{}: {} kills".format(
         weapon[11:], round(best)) if best else "You ain't got no best weapon!"
+
+def get_stat(data, stat):
+    if stat in WEAPON_TYPES:
+        stat = "weaponKills{}".format(stat)
+    if stat in data:
+        return '\x02{}\x02: {}'.format(
+            data[stat]['statId'], data[stat]['basic']['displayValue'])
+    elif stat.lower() == 'k/d':
+        return '\x02k/d\x02: {}'.format(round(
+            data['kills']['basic']['value'] / data['deaths']['basic']['value'], 2))
+    elif stat == 'bestWeapon':
+        return '\x02bestWeapon\x02: {}'.format(best_weapon(data))
+    else:
+        return "Invalid option {}".format(stat)
 
 
 @hook.on_start()
@@ -394,31 +379,32 @@ def pvp(text, nick, bot):
         text.extend([
             'k/d', 'bestSingleGameKills', 'longestKillSpree',
             'longestSingleLife', 'orbsDropped', 'bestWeapon'])
+    split = True if 'split' in text else False
+    path = 'characters' if split else 'mergedAllCharacters'
 
     output = []
     for console in membership:
-        stats = get(
+        data = get(
             "{}Stats/Account/{}/{}/".format(
                 BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
-        ).json()['Response']['mergedAllCharacters']['results']['allPvP']['allTime']
+        ).json()['Response'][path]
         tmp_out = []
-        for stat in text[1:]:
-            if stat in WEAPON_TYPES:
-                stat = "weaponKills{}".format(stat)
-            if stat in stats:
-                tmp_out.append('\x02{}\x02: {}'.format(
-                    stats[stat]['statId'], stats[stat]['basic']['displayValue']))
-            elif stat.lower() == 'k/d':
-                tmp_out.append('\x02k/d\x02: {}'.format(round(
-                    stats['kills']['basic']['value'] / stats['deaths']['basic']['value'], 2)))
-            elif stat == 'bestWeapon':
-                tmp_out.append('\x02bestWeapon\x02: {}'.format(best_weapon(stats)))
-            else:
-                tmp_out.append("Invalid option {}".format(stat))
+        if split:
+            if text[1] not in PVP_OPTS and text[1] not in WEAPON_TYPES:
+                return 'I can\'t split {}. Try another option.'.format(text[1])
+            for character in data:
+                if not character['deleted'] and character['results']['allPvP'].get('allTime', False):
+                    tmp_out.append('\x02{}\x02 {}'.format(
+                        membership[console]['characters'][character['characterId']]['class'],
+                        get_stat(character['results']['allPvP']['allTime'], text[1])
+                    ))
+        else:
+            data = data['results']['allPvP']['allTime']
+            for stat in text[1:]:
+                tmp_out.append(get_stat(data, stat))
 
-        output.append("{} - {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
-
+        output.append("{}: {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
     return "; ".join(output)
 
 
