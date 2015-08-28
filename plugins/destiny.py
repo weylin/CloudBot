@@ -454,4 +454,6 @@ def compare(text, bot):
 def ping(text, bot):
     return 'pong'
 
-
+@hook.command('100')
+def the100(bot):
+    return 'Check out our The100.io group here: https://www.the100.io/g/1151'
