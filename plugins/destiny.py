@@ -14,9 +14,10 @@ HEADERS = {}
 WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
     'HandCannon', 'Machinegun', 'PulseRifle', 'RocketLauncher', 'ScoutRifle',
     'Shotgun', 'Sniper', 'Submachinegun', 'Relic', 'SideArm']
-PVP_OPTS = ['assists', 'kills', 'deaths', 'k/d', 'bestSingleGameKills',
-    'bestSingleGameScore', 'bestWeapon', 'suicides', 'longestKillSpree',
-    'longestSingleLife', 'orbsDropped', 'zonesCaptured']
+PVP_OPTS = ['activitiesEntered', 'assists', 'avgKillDistance', 'deaths', 'kills', 'k/d',
+    'bestSingleGameKills', 'bestSingleGameScore', 'bestWeapon', 'longestKillSpree',
+    'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
+    'precisionRate', 'suicides', 'winRate', 'zonesCaptured']
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -32,7 +33,7 @@ class MLStripper(HTMLParser):
 def strip_tags(html):
     s = MLStripper()
     s.feed(html)
-    return s.get_data().replace('\n','\t')
+    return s.get_data().replace('\n', '\t')
 
 
 def get_user(user_name):
@@ -108,9 +109,18 @@ def get_stat(data, stat):
     if stat in data:
         return '\x02{}\x02: {}'.format(
             data[stat]['statId'], data[stat]['basic']['displayValue'])
-    elif stat.lower() == 'k/d':
+    elif stat == 'k/d':
         return '\x02k/d\x02: {}'.format(round(
             data['kills']['basic']['value'] / data['deaths']['basic']['value'], 2))
+    elif stat == 'avgKillDistance':
+        return '\x02avgKillDistance\x02: {}m'.format(round(
+            data['totalKillDistance']['basic']['value'] / data['kills']['basic']['value'], 2))
+    elif stat == 'winRate':
+        return '\x02winRate\x02: {}'.format(round(data['activitiesWon']['basic']['value'] / (
+            data['activitiesEntered']['basic']['value'] - data['activitiesWon']['basic']['value']), 2))
+    elif stat == 'precisionRate':
+        return '\x02precisionRate\x02: {}'.format(round(data['precisionKills']['basic']['value'] / (
+            data['kills']['basic']['value'] - data['precisionKills']['basic']['value']), 2))
     elif stat == 'bestWeapon':
         return '\x02bestWeapon\x02: {}'.format(best_weapon(data))
     else:
@@ -315,6 +325,7 @@ def xur(text, bot):
 def lore(text, bot):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
         prepare_lore_cache()
+        text = ''
 
     name = ''
     if not text:  # if we aren't searching, return a random card
@@ -337,7 +348,7 @@ def lore(text, bot):
 
     contents = LORE_CACHE[name]  # get the actual card contents
     output = strip_tags("{}: {} - {}".format(
-        name, contents.get('cardIntro', ''), contents['cardDescription']))
+        name, contents.get('cardIntro', ''), contents.get('cardDescription', '')))
     if len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
             output[:301], contents['cardId'])
@@ -369,7 +380,7 @@ def pvp(text, nick, bot):
         text = nick
     text = text.split(" ")
     if text[0].lower() == 'help':
-        return 'options: {}'.format(", ".join(PVP_OPTS))
+        return 'options: {}'.format(", ".join(PVP_OPTS + WEAPON_TYPES))
     elif text[0] in PVP_OPTS or text[0] in WEAPON_TYPES:
         text = [nick] + text
     membership = get_user(text[0])
