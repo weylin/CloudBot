@@ -18,6 +18,11 @@ PVP_OPTS = ['activitiesEntered', 'assists', 'avgKillDistance', 'deaths', 'kills'
     'bestSingleGameKills', 'bestSingleGameScore', 'bestWeapon', 'longestKillSpree',
     'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
     'precisionRate', 'suicides', 'winRate', 'zonesCaptured']
+PVE_OPTS = ['activitiesEntered', 'activitiesCleared', 'avgKillDistance',
+    'bestSingleGameKills', 'bestWeapon', 'longestKillSpree', 'deaths', 'kills', 'k/h',
+    'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
+    'precisionRate', 'suicides', 'winRate', 'publicEventsCompleted']
+
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -112,6 +117,9 @@ def get_stat(data, stat):
     elif stat == 'k/d':
         return '\x02k/d\x02: {}'.format(round(
             data['kills']['basic']['value'] / data['deaths']['basic']['value'], 2))
+    elif stat == 'k/h':
+        return '\x02k/h\x02: {}'.format(round(data['kills']['basic']['value'] / (
+            data['secondsPlayed']['basic']['value'] / 3600), 2))
     elif stat == 'avgKillDistance':
         return '\x02avgKillDistance\x02: {}m'.format(round(
             data['totalKillDistance']['basic']['value'] / data['kills']['basic']['value'], 2))
@@ -125,6 +133,48 @@ def get_stat(data, stat):
         return '\x02bestWeapon\x02: {}'.format(best_weapon(data))
     else:
         return "Invalid option {}".format(stat)
+
+
+def compile_stats(text, nick, bot, opts, defaults, st_type):
+    if not text:
+        text = nick
+    text = text.split(" ")
+    if text[0].lower() == 'help':
+        return 'options: {}'.format(", ".join(opts + WEAPON_TYPES))
+    elif text[0] in opts or text[0] in WEAPON_TYPES:
+        text = [nick] + text
+    membership = get_user(text[0])
+    if type(membership) == str:
+        return membership
+    if len(text) == 1:  # if no stats are specified, add some
+        text.extend(defaults)
+    split = True if 'split' in text else False
+    path = 'characters' if split else 'mergedAllCharacters'
+
+    output = []
+    for console in membership:
+        data = get(
+            "{}Stats/Account/{}/{}/".format(
+                BASE_URL, console, membership[console]['membershipId']),
+            headers=HEADERS
+        ).json()['Response'][path]
+        tmp_out = []
+        if split:
+            if text[1] not in opts and text[1] not in WEAPON_TYPES:
+                return 'I can\'t split {}. Try another option.'.format(text[1])
+            for character in data:
+                if not character['deleted'] and character['results'][st_type].get('allTime', False):
+                    tmp_out.append('\x02{}\x02 {}'.format(
+                        membership[console]['characters'][character['characterId']]['class'],
+                        get_stat(character['results'][st_type]['allTime'], text[1])
+                    ))
+        else:
+            data = data['results'][st_type]['allTime']
+            for stat in text[1:]:
+                tmp_out.append(get_stat(data, stat))
+
+        output.append("{}: {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
+    return "; ".join(output)
 
 
 @hook.on_start()
@@ -246,6 +296,7 @@ def weekly(text, bot):
         else:
             return 'weylin lied to me, get good scrub.'
 
+
 @hook.command('triumph')
 def triumph(text, nick, bot):
     text = nick if not text else text
@@ -289,6 +340,7 @@ def triumph(text, nick, bot):
 
     return output
 
+
 @hook.command('xur')
 def xur(text, bot):
     if CACHE.get('xur', None) and not text.lower() == 'flush':
@@ -320,6 +372,7 @@ def xur(text, bot):
             ', '.join(armor_list), weapon, engram)
         CACHE['xur'] = output
         return output
+
 
 @hook.command('lore')
 def lore(text, bot):
@@ -355,6 +408,7 @@ def lore(text, bot):
 
     return output if len(output) > 5 else lore('', bot)
 
+
 @hook.command('grim')
 def grim(text, nick, bot):
     text = nick if not text else text
@@ -376,47 +430,30 @@ def grim(text, nick, bot):
 
 @hook.command('pvp')
 def pvp(text, nick, bot):
-    if not text:
-        text = nick
-    text = text.split(" ")
-    if text[0].lower() == 'help':
-        return 'options: {}'.format(", ".join(PVP_OPTS + WEAPON_TYPES))
-    elif text[0] in PVP_OPTS or text[0] in WEAPON_TYPES:
-        text = [nick] + text
-    membership = get_user(text[0])
-    if type(membership) == str:
-        return membership
-    if len(text) == 1:  # if no stats are specified, add some
-        text.extend([
-            'k/d', 'bestSingleGameKills', 'longestKillSpree',
-            'longestSingleLife', 'orbsDropped', 'bestWeapon'])
-    split = True if 'split' in text else False
-    path = 'characters' if split else 'mergedAllCharacters'
+    defaults = ['k/d', 'bestSingleGameKills', 'longestKillSpree',
+        'longestSingleLife', 'orbsDropped', 'bestWeapon']
+    return compile_stats(
+        text=text,
+        nick=nick,
+        bot=bot,
+        opts=PVP_OPTS,
+        defaults=defaults,
+        st_type='allPvP'
+    )
 
-    output = []
-    for console in membership:
-        data = get(
-            "{}Stats/Account/{}/{}/".format(
-                BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response'][path]
-        tmp_out = []
-        if split:
-            if text[1] not in PVP_OPTS and text[1] not in WEAPON_TYPES:
-                return 'I can\'t split {}. Try another option.'.format(text[1])
-            for character in data:
-                if not character['deleted'] and character['results']['allPvP'].get('allTime', False):
-                    tmp_out.append('\x02{}\x02 {}'.format(
-                        membership[console]['characters'][character['characterId']]['class'],
-                        get_stat(character['results']['allPvP']['allTime'], text[1])
-                    ))
-        else:
-            data = data['results']['allPvP']['allTime']
-            for stat in text[1:]:
-                tmp_out.append(get_stat(data, stat))
 
-        output.append("{}: {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
-    return "; ".join(output)
+@hook.command('pve')
+def pve(text, nick, bot):
+    defaults = ['k/h', 'activitiesCleared', 'longestKillSpree',
+        'publicEventsCompleted', 'orbsDropped', 'bestWeapon']
+    return compile_stats(
+        text=text,
+        nick=nick,
+        bot=bot,
+        opts=PVE_OPTS,
+        defaults=defaults,
+        st_type='allPvE'
+    )
 
 
 @hook.command('link')
