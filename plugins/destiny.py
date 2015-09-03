@@ -456,6 +456,29 @@ def pve(text, nick, bot):
     )
 
 
+@hook.command('ghosts')
+def ghosts(text, nick, bot):
+    text = nick if not text else text
+    membership = get_user(text)
+    if type(membership) == str:
+        return membership
+    output = []
+    for console in membership:
+        data = get(
+            "{}Vanguard/Grimoire/{}/{}/"
+            .format(BASE_URL, console, membership[console]['membershipId']),
+            headers=HEADERS
+        ).json()['Response']['data']['cardCollection']
+        for card in data:
+            if card['cardId'] == 103094:
+                output.append('{}: {}/77'.format(
+                    CONSOLES[console - 1],
+                    card['statisticCollection'][0]['displayValue'])
+                )
+    return output
+
+
+
 @hook.command('link')
 def link(text, nick, bot):
     text = text.split(" ")
