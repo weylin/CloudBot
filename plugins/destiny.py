@@ -514,3 +514,7 @@ def ping(text, bot):
 @hook.command('100')
 def the100(bot):
     return 'Check out our The100.io group here: https://www.the100.io/g/1151'
+
+@hook.command('clan')
+def clan(bot):
+    return 'Check out our Clan: https://www.bungie.net/en/Clan/Detail/939927'
