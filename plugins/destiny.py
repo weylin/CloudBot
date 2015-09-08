@@ -242,7 +242,10 @@ def item_search(text, bot):
 @hook.command('nightfall')
 def nightfall(text, bot):
     if CACHE.get('nightfall', None) and not text.lower() == 'flush':
-        return CACHE['nightfall']
+        if 'last' in text.lower():
+            return CACHE.get('last_nightfall', 'Unavailable')
+        else:
+            return CACHE['nightfall']
     else:
         nightfallActivityId = get(
             '{}advisors/?definitions=true'.format(BASE_URL),
@@ -263,6 +266,8 @@ def nightfall(text, bot):
                 nightfallDefinition['skulls'][3]['displayName'],
                 nightfallDefinition['skulls'][4]['displayName'],
             )
+            if output != CACHE['nightfall']:
+                CACHE['last_nightfall'] = CACHE['nightfall']
             CACHE['nightfall'] = output
             return output
         else:
@@ -272,7 +277,10 @@ def nightfall(text, bot):
 @hook.command('weekly')
 def weekly(text, bot):
     if CACHE.get('weekly', None) and not text.lower() == 'flush':
-        return CACHE['weekly']
+        if 'last' in text.lower():
+            return CACHE.get('last_weekly', 'Unavailable')
+        else:
+            return CACHE['weekly']
     else:
         weeklyHeroicId = get(
             '{}advisors/?definitions=true'.format(BASE_URL),
@@ -291,6 +299,8 @@ def weekly(text, bot):
                 weeklyHeroicDefinition['activityDescription'],
                 weeklyHeroicDefinition['skulls'][1]['displayName']
             )
+            if output != CACHE['weekly']:
+                CACHE['last_weekly'] = CACHE['weekly']
             CACHE['weekly'] = output
             return output
         else:
@@ -344,7 +354,10 @@ def triumph(text, nick, bot):
 @hook.command('xur')
 def xur(text, bot):
     if CACHE.get('xur', None) and not text.lower() == 'flush':
-        return CACHE['xur']
+        if 'last' in text.lower():
+            return CACHE.get('last_xur', 'Unavailable')
+        else:
+            return CACHE['xur']
     else:
         xurStock = get(
             "{}Advisors/Xur/?definitions=true".format(BASE_URL),
@@ -370,6 +383,8 @@ def xur(text, bot):
         engram = text['items'][str(exoticsHash[5]['itemHash'])]['itemTypeName']
         output = '\x02Armor\x02 {} \x02Weapon\x02 {} \x02Engram\x02 {}'.format(
             ', '.join(armor_list), weapon, engram)
+        if output != CACHE['xur']:
+            CACHE['last_xur'] = CACHE['xur']
         CACHE['xur'] = output
         return output
 
