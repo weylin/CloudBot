@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 from random import sample
 from requests import get
 from pickle import dump, load
+import datetime
 
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
@@ -23,7 +24,6 @@ PVE_OPTS = ['activitiesEntered', 'activitiesCleared', 'avgKillDistance',
     'bestSingleGameKills', 'bestWeapon', 'longestKillSpree', 'deaths', 'kills', 'k/h',
     'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
     'precisionRate', 'suicides', 'winRate', 'publicEventsCompleted']
-
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -354,11 +354,38 @@ def triumph(text, nick, bot):
 
 @hook.command('xur')
 def xur(text, bot):
+    if 'last' in text.lower():
+        return CACHE.get('last_xur', 'Unavailable')
+
+    # reset happens at 9am UTC, so subtract that to simplify the math
+    now = datetime.datetime.utcnow() - datetime.timedelta(hours=9)
+
+    # xur is available from friday's reset until sunday's reset, i.e. friday (4) and saturday (5)
+    if now.weekday() not in [4, 5]:
+        xursday_diff = 4 - now.weekday()
+        if xursday_diff < -1: # if past saturday, bump to next week
+            xursday_diff += 7
+
+        xursday = (now + datetime.timedelta(days=xursday_diff)).replace(hour=0, minute=0, second=0, microsecond=0)
+        time_to_xursday = xursday - now
+
+        s = time_to_xursday.seconds
+        h, s = divmod(s, 3600)
+        m, s = divmod(s, 60)
+
+        output = []
+
+        if time_to_xursday.days > 0:
+            output.append("{} days".format(time_to_xursday.days))
+
+        if h: output.append("{} hours".format(h))
+        if m: output.append("{} minutes".format(m))
+        if s: output.append("{} seconds".format(s))
+
+        return '\x02Xûr will return in\x02 {}'.format(", ".join(output))
+
     if CACHE.get('xur', None) and not text.lower() == 'flush':
-        if 'last' in text.lower():
-            return CACHE.get('last_xur', 'Unavailable')
-        else:
-            return CACHE['xur']
+        return CACHE['xur']
 
     xurStock = get(
         "{}Advisors/Xur/?definitions=true".format(BASE_URL),
