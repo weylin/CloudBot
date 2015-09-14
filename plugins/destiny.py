@@ -510,7 +510,7 @@ def ghosts(text, nick, bot):
         ).json()['Response']['data']['cardCollection']
         for card in data:
             if card['cardId'] == 103094:
-                output.append('{}: {}/77'.format(
+                output.append('{}: {}/88'.format(
                     CONSOLES[console - 1],
                     card['statisticCollection'][0]['displayValue'])
                 )
