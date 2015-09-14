@@ -433,6 +433,8 @@ def lore(text, bot):
     else:
         matches = []
         for entry in LORE_CACHE:
+            if entry == 'grim_tally':
+                continue
             if text.lower() == entry.lower():
                 name = entry
             elif text.lower() in entry.lower() or text.lower() in LORE_CACHE[entry].get('cardDescription', '').lower():
@@ -443,8 +445,8 @@ def lore(text, bot):
             elif len(matches) == 0:
                 return "I ain't found shit!"
             else:
-                return ("Search too ambiguous, please be more specific "
-                        "(e.g. {}).".format(", ".join(matches[:3])))
+                return ("I found {} matches, please be more specific "
+                        "(e.g. {}).".format(len(matches),", ".join(matches[:3])))
 
     contents = LORE_CACHE[name]  # get the actual card contents
     output = strip_tags("{}: {} - {}".format(
@@ -523,7 +525,6 @@ def ghosts(text, nick, bot):
                     card['statisticCollection'][0]['displayValue'])
                 )
     return output
-
 
 
 @hook.command('link')
