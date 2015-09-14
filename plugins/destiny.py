@@ -1,10 +1,12 @@
+import datetime
 import json
 from cloudbot import hook
 from html.parser import HTMLParser
 from random import sample
 from requests import get
 from pickle import dump, load
-import datetime
+from feedparser import parse
+from cloudbot.util.web import try_shorten
 
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
@@ -586,3 +588,13 @@ def the100(bot):
 @hook.command('clan')
 def clan(bot):
     return 'Check out our Clan: https://www.bungie.net/en/Clan/Detail/939927'
+
+@hook.command('news')
+def news(bot):
+    feed = parse("https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1")
+    if not feed.entries:
+        return "Feed not found."
+
+    return "{} - {}".format(
+        feed['entries'][0]['summary'],
+        try_shorten(feed['entries'][0]['link']))
