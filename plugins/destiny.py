@@ -89,14 +89,18 @@ def prepare_lore_cache():
 
     global LORE_CACHE
     LORE_CACHE = {}
+    grim_tally = 0
     for level1 in lore_base:
-        for level2 in level1['pageCollection']:
-            for card in level2['cardCollection']:
+        for level2 in level1.get('pageCollection', []):
+            for card in level2.get('cardCollection', []):
                 LORE_CACHE[card['cardName']] = {
                     'cardIntro': card.get('cardIntro', ''),
                     'cardDescription': card['cardDescription'],
                     'cardId': card['cardId']
                 }
+            for card in level2.get('cardBriefs', []):
+                grim_tally += card.get('totalPoints', 0)
+    LORE_CACHE['grim_tally'] = grim_tally
 
 def best_weapon(data):
     best = 0
@@ -422,12 +426,14 @@ def lore(text, bot):
     name = ''
     if not text:  # if we aren't searching, return a random card
         name = sample(list(LORE_CACHE), 1)[0]
+        while name == 'grim_tally':
+            name = sample(list(LORE_CACHE), 1)[0]
     else:
         matches = []
         for entry in LORE_CACHE:
-            if text.lower() in entry.lower():
+            if text.lower() == entry.lower():
                 name = entry
-            elif text.lower() in entry.lower():
+            elif text.lower() in entry.lower() or text.lower() in LORE_CACHE[entry].get('cardDescription', '').lower():
                 matches.append(entry)
         if not name:
             if len(matches) == 1:
@@ -461,8 +467,8 @@ def grim(text, nick, bot):
             .format(BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
         ).json()['Response']['data']['score']
-        output.append("{}'s grimoire score on the {} is {}.".format(
-            text, CONSOLES[console - 1], score))
+        output.append("{}'s grimoire score on the {} is {} out of {}.".format(
+            text, CONSOLES[console - 1], score, LORE_CACHE['grim_tally']))
 
     return output
 
@@ -510,7 +516,7 @@ def ghosts(text, nick, bot):
         ).json()['Response']['data']['cardCollection']
         for card in data:
             if card['cardId'] == 103094:
-                output.append('{}: {}/88'.format(
+                output.append('{}: {} out of 98'.format(
                     CONSOLES[console - 1],
                     card['statisticCollection'][0]['displayValue'])
                 )
