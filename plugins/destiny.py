@@ -73,6 +73,7 @@ def get_user(user_name):
                     'class': character['characterClass']['className']
                 }
             user_dict = {
+                'userId': userID['membershipId'],
                 'membershipId': result['userInfo']['membershipId'],
                 'clan': result.get('clanName', 'None'),
                 'characters': character_dict
@@ -420,10 +421,14 @@ def xur(text, bot):
 
 
 @hook.command('lore')
-def lore(text, bot):
+def lore(text, bot, notice):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
         prepare_lore_cache()
         text = ''
+    complete = False
+    if "complete" in text:
+        complete = True
+        text = text.replace("complete", "").strip()
 
     name = ''
     if not text:  # if we aren't searching, return a random card
@@ -444,18 +449,29 @@ def lore(text, bot):
                 name = matches[0]
             elif len(matches) == 0:
                 return "I ain't found shit!"
+            elif complete:
+                notice("I found {} matches. You can choose from:".format(len(matches)))
+                for line in matches:
+                    notice(line)
+                return
             else:
                 return ("I found {} matches, please be more specific "
-                        "(e.g. {}).".format(len(matches),", ".join(matches[:3])))
+                        "(e.g. {}). For a complete list use 'complete'".format(
+                            len(matches), ", ".join(matches[:3])))
 
     contents = LORE_CACHE[name]  # get the actual card contents
     output = strip_tags("{}: {} - {}".format(
         name, contents.get('cardIntro', ''), contents.get('cardDescription', '')))
-    if len(output) > 300:
+
+    if complete:
+        for line in output:
+            notice(line)
+        return
+    elif len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
             output[:301], contents['cardId'])
 
-    return output if len(output) > 5 else lore('', bot)
+    return output if len(output) > 5 else lore('', bot, notice)
 
 
 @hook.command('grim')
@@ -567,6 +583,65 @@ def purge(text, nick, bot):
     else:
         CACHE[user_name] = membership
         return output if output else "Nothing to purge. WTF you doin?!"
+
+
+@hook.command('profile')
+def profile(text, nick, bot):
+    text = nick if not text else text
+    membership = get_user(text)
+    if type(membership) is not dict:
+        return membership
+    return "https://www.bungie.net/en/Profile/254/{}".format(
+        membership.get(1, membership.get(2, None))['userId'])
+
+
+@hook.command('chars')
+def chars(text, nick, bot):
+    text = nick if not text else text.lower()
+    text = text.split(" ")
+    if text[0] in ['xbox', 'playstation', '1', '2', '3']:
+        text = [nick] + text
+    text[0] = CACHE['links'].get(text[0], text[0])
+    if type(get_user(text[0])) is not dict:
+        return "A user by the name {} was not found.".format(text[0])
+    userID = get("http://www.bungie.net/Platform/User/SearchUsers/?q={}".format(
+                 text[0].strip()), headers=HEADERS).json()['Response'][0]
+    systems, characters = ([], [])
+    if len(text) > 1:
+        # narrow down our results
+        for x in text[1:]:
+            if x == 'xbox': systems.append(1)
+            if x == 'playstation': systems.append(2)
+            if x in ['1', '2', '3']: characters.append(int(x))
+
+    userHash = get("https://www.bungie.net/platform/User/GetBungieAccount"
+                   "/{}/254/".format(userID['membershipId'])
+               ).json()['Response']['destinyAccounts']
+    output = []
+    for console in userHash:
+        if console['userInfo']['membershipType'] not in systems and systems:
+            continue
+        console_output = []
+        for i in range(len(console['characters'])):
+            if i + 1 not in characters and characters:
+                continue
+            console_output.append("{} {} {} {} Light Level: {} {}".format(
+                console['characters'][i]['level'],
+                console['characters'][i]['race']['raceName'],
+                console['characters'][i]['gender']['genderName'],
+                console['characters'][i]['characterClass']['className'],
+                console['characters'][i]['powerLevel'],
+                try_shorten("https://www.bungie.net/en/Legend/Gear/{}/{}/{}".format(
+                    console['userInfo']['membershipType'],
+                    console['userInfo']['membershipId'],
+                    console['characters'][i]['characterId']
+                ))
+            ))
+        output.append("{}: {}".format(
+            CONSOLES[console['userInfo']['membershipType'] - 1],
+            " , ".join(console_output)
+        ))
+    return "; ".join(output)
 
 
 @hook.command('rules')
