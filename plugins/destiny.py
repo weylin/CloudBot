@@ -594,10 +594,9 @@ def profile(text, nick, bot):
     return "https://www.bungie.net/en/Profile/254/{}".format(
         membership.get(1, membership.get(2, None))['userId'])
 
-
 @hook.command('chars')
 def chars(text, nick, bot):
-    text = nick if not text else text.lower()
+    text = nick if not text else text
     text = text.split(" ")
     if text[0] in ['xbox', 'playstation', '1', '2', '3']:
         text = [nick] + text
@@ -625,12 +624,11 @@ def chars(text, nick, bot):
         for i in range(len(console['characters'])):
             if i + 1 not in characters and characters:
                 continue
-            console_output.append("{} {} {} {} Light Level: {} {}".format(
-                console['characters'][i]['level'],
-                console['characters'][i]['race']['raceName'],
-                console['characters'][i]['gender']['genderName'],
                 console['characters'][i]['characterClass']['className'],
+            console_output.append("✦{} // {} // {} - {}".format(
                 console['characters'][i]['powerLevel'],
+                console['characters'][i]['characterClass']['className'],
+                console['characters'][i]['race']['raceName'],
                 try_shorten("https://www.bungie.net/en/Legend/Gear/{}/{}/{}".format(
                     console['userInfo']['membershipType'],
                     console['userInfo']['membershipId'],
@@ -639,10 +637,9 @@ def chars(text, nick, bot):
             ))
         output.append("{}: {}".format(
             CONSOLES[console['userInfo']['membershipType'] - 1],
-            " , ".join(console_output)
+            " || ".join(console_output)
         ))
-    return "; ".join(output)
-
+    return " ; ".join(output)
 
 @hook.command('rules')
 def rules(bot):
