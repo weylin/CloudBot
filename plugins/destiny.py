@@ -93,7 +93,13 @@ def prepare_lore_cache():
     global LORE_CACHE
     LORE_CACHE = {}
     grim_tally = 0
+    fragments = {}
     for level1 in lore_base:
+        if level1.get('themeId','') == 'Enemies':
+            for page in level1['pageCollection']:
+                if page['pageId'] == 'BooksofSorrow':
+                    for card in page['cardCollection']:
+                        fragments[card['cardId']] = card['cardName']
         for level2 in level1.get('pageCollection', []):
             for card in level2.get('cardCollection', []):
                 LORE_CACHE[card['cardName']] = {
@@ -103,7 +109,9 @@ def prepare_lore_cache():
                 }
             for card in level2.get('cardBriefs', []):
                 grim_tally += card.get('totalPoints', 0)
-    LORE_CACHE['grim_tally'] = grim_tally
+    CACHE['collections']['grim_tally'] = grim_tally
+    CACHE['collections']['fragments'] = fragments
+
 
 def best_weapon(data):
     best = 0
@@ -198,6 +206,8 @@ def load_cache(bot):
         CACHE = {}
     if not CACHE.get('links'):
         CACHE['links'] = {}
+    if not CACHE.get('collections'):
+        CACHE['collections'] = {'ghost_tally': 98}
     try:
         with open('lore_cache', 'rb') as f:
             global LORE_CACHE
@@ -464,8 +474,7 @@ def lore(text, bot, notice):
         name, contents.get('cardIntro', ''), contents.get('cardDescription', '')))
 
     if complete:
-        for line in output:
-            notice(line)
+        notice(output)
         return
     elif len(output) > 300:
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
@@ -519,6 +528,34 @@ def pve(text, nick, bot):
         defaults=defaults,
         st_type='allPvE'
     )
+
+
+@hook.command('collection')
+def collection(text, nick, bot):
+    text = nick if not text else text
+    membership = get_user(text)
+    if type(membership) == str:
+        return membership
+    output = []
+    for console in membership:
+        grimoire = get(
+            "{}Vanguard/Grimoire/{}/{}/"
+            .format(BASE_URL, console, membership[console]['membershipId']),
+            headers=HEADERS
+        ).json()['Response']['data']
+        found_frags = []
+        ghosts = 0
+        for card in grimoire['cardCollection']:
+            if card['cardId'] in CACHE['collections']['fragments']:
+                found_frags.append([card['cardId']])
+            elif card['cardId'] == 103094:
+                ghosts = card['statisticCollection'][0]['displayValue']
+        output.append("{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}".format(
+            CONSOLES[console - 1], grimoire['score'], CACHE['collections']['grim_tally'],
+            ghosts, CACHE['collections']['ghost_tally'],
+            len(found_frags), len(CACHE['collections']['fragments']))
+        )
+    return output
 
 
 @hook.command('ghosts')
@@ -614,7 +651,7 @@ def chars(text, nick, bot):
             if x in ['1', '2', '3']: characters.append(int(x))
 
     userHash = get("https://www.bungie.net/platform/User/GetBungieAccount"
-                   "/{}/254/".format(userID['membershipId'])
+                   "/{}/254/".format(userID['membershipId']), headers=HEADERS
                ).json()['Response']['destinyAccounts']
     output = []
     for console in userHash:
@@ -624,22 +661,23 @@ def chars(text, nick, bot):
         for i in range(len(console['characters'])):
             if i + 1 not in characters and characters:
                 continue
-                console['characters'][i]['characterClass']['className'],
+            console['characters'][i]['characterClass']['className'],
             console_output.append("✦{} // {} // {} - {}".format(
-                console['characters'][i]['powerLevel'],
-                console['characters'][i]['characterClass']['className'],
-                console['characters'][i]['race']['raceName'],
-                try_shorten("https://www.bungie.net/en/Legend/Gear/{}/{}/{}".format(
-                    console['userInfo']['membershipType'],
-                    console['userInfo']['membershipId'],
-                    console['characters'][i]['characterId']
-                ))
+            console['characters'][i]['powerLevel'],
+            console['characters'][i]['characterClass']['className'],
+            console['characters'][i]['race']['raceName'],
+            try_shorten("https://www.bungie.net/en/Legend/Gear/{}/{}/{}".format(
+                console['userInfo']['membershipType'],
+                console['userInfo']['membershipId'],
+                console['characters'][i]['characterId']
             ))
+        ))
         output.append("{}: {}".format(
             CONSOLES[console['userInfo']['membershipType'] - 1],
             " || ".join(console_output)
         ))
     return " ; ".join(output)
+
 
 @hook.command('rules')
 def rules(bot):
