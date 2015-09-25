@@ -408,7 +408,7 @@ def xur(text, bot):
         "{}Advisors/Xur/?definitions=true".format(BASE_URL),
         headers=HEADERS).json()['Response']
 
-    items = [i['item'] for i in xurStock['data']['saleItemCategories'][0]['saleItems']]
+    items = [i['item'] for i in xurStock['data']['saleItemCategories'][2]['saleItems']]
     definitions = xurStock['definitions']['items']
 
     output = []
