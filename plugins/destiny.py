@@ -223,7 +223,7 @@ def save_cache():
         dump(CACHE, f)
         output = ["Main cache saved"]
     with open('lore_cache', 'wb') as f:
-        dump(CACHE, f)
+        dump(LORE_CACHE, f)
         output.append("Lore cache saved")
     return output
 
@@ -592,7 +592,7 @@ def link(text, nick, bot):
 
 @hook.command('migrate')
 def migrate(text, nick, bot):
-    if nick in ['weylin', 'avcables[PS4]', 'DoctorRaptorMD[XB1]']:
+    if nick in ['weylin', 'avcables[PS4]', 'DoctorRaptorMD[XB1]', 'tuzonghua[PS4]']:
         global CACHE
         CACHE = {'links': CACHE['links']}
         return "Sucessfully migrated! Now run the save command."
