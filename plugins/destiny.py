@@ -257,7 +257,7 @@ def item_search(text, bot):
     return output[:3]
 
 
-@hook.command('nightfall')
+#@hook.command('nightfall')
 def nightfall(text, bot):
     if CACHE.get('nightfall', None) and not text.lower() == 'flush':
         if 'last' in text.lower():
@@ -292,7 +292,7 @@ def nightfall(text, bot):
             return 'weylin lied to me, get good scrub.'
 
 
-@hook.command('weekly')
+#@hook.command('weekly')
 def weekly(text, bot):
     if CACHE.get('weekly', None) and not text.lower() == 'flush':
         if 'last' in text.lower():
@@ -483,7 +483,7 @@ def lore(text, bot, notice):
     return output if len(output) > 5 else lore('', bot, notice)
 
 
-@hook.command('grim')
+#@hook.command('grim')
 def grim(text, nick, bot):
     text = nick if not text else text
     membership = get_user(text)
@@ -558,7 +558,7 @@ def collection(text, nick, bot):
     return output
 
 
-@hook.command('ghosts')
+#@hook.command('ghosts')
 def ghosts(text, nick, bot):
     text = nick if not text else text
     membership = get_user(text)
