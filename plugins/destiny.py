@@ -550,6 +550,8 @@ def collection(text, nick, bot):
                 found_frags.append([card['cardId']])
             elif card['cardId'] == 103094:
                 ghosts = card['statisticCollection'][0]['displayValue']
+                if int(ghosts) >= 98:
+                    ghosts = 98
         output.append("{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}".format(
             CONSOLES[console - 1], grimoire['score'], CACHE['collections']['grim_tally'],
             ghosts, CACHE['collections']['ghost_tally'],
