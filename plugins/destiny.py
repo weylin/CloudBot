@@ -11,6 +11,8 @@ from cloudbot.util.web import try_shorten
 BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
 CLASS_TYPES = {0: 'Titan ', 1: 'Hunter ', 2: 'Warlock ', 3: ''}
+CLASS_HASH = {671679327: 'Hunter', 3655393761: 'Titan', 2271682572: 'Warlock'}
+RACE_HASH = {898834093: 'Exo', 3887404748: 'Human', 2803282938: 'Awoken'}
 CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0312Playstation\x02\x03']
 STAT_HASHES = {144602215: 'Int', 1735777505: 'Disc', 4244567218: 'Str'}
 LORE_CACHE = {}
@@ -43,45 +45,47 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data().replace('\n', '\t')
 
-
 def get_user(user_name):
     '''
     Takes in a username and returns a dictionary of all systems they are
     on as well as their associated id for that system, plus general information
     '''
-    user_name = CACHE['links'].get(user_name, user_name)
+    platforms = CACHE['links'].get(user_name, user_name)
+
     if CACHE.get(user_name, None):
         return CACHE[user_name]
     else:
-        try:
-            userID = get(
-                'http://www.bungie.net/Platform/User/SearchUsers/?q={}'.format(user_name.strip()),
-                headers=HEADERS).json()['Response'][0]
-            userHash = get(
-                'https://www.bungie.net/platform/User/GetBungieAccount/{}/254/'
-                .format(userID['membershipId']),
-                headers=HEADERS).json()['Response']['destinyAccounts']
-        except:
-            return 'A user by the name {} was not found.'.format(user_name)
+        for platform in platforms:
+            user_name = platforms[platform]
+            try:
+                # Get the Destiny membership ID
+                membershipId = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, user_name),
+                    headers=HEADERS).json()['Response'][0]['membershipId']
+                # Then get Destiny summary
+                characterHash = get(
+                    '{}{}/Account/{}/Summary/'
+                    .format(BASE_URL, platform, membershipId),
+                    headers=HEADERS).json()['Response']['data']
+            except:
+                return 'A user by the name {} was not found.'.format(user_name)
 
-        user_info = {}
-        for result in userHash:
+            user_info = {}
             character_dict = {}
-            for character in result['characters']:
-                character_dict[character['characterId']] = {
-                    'level': character['level'],
-                    'class': character['characterClass']['className']
+            for character in characterHash['characters']:
+                character_dict[character['characterBase']['characterId']] = {
+                    'level': character['characterLevel'],
+                    'race': RACE_HASH[character['characterBase']['raceHash']],
+                    'class': CLASS_HASH[character['characterBase']['classHash']]
                 }
             user_dict = {
-                'userId': userID['membershipId'],
-                'membershipId': result['userInfo']['membershipId'],
-                'clan': result.get('clanName', 'None'),
+                'membershipId': membershipId,
+                'clan': characterHash.get('clanName', 'None'),
                 'characters': character_dict
             }
-            user_info[result['userInfo']['membershipType']] = user_dict
+            user_info[platform] = user_dict
 
-        CACHE[userID['displayName']] = user_info
-        return user_info if user_info != {} else 'A user by the name {} was not found.'.format(user_name)
+            CACHE[user_name] = user_info
+            return user_info if user_info != {} else 'A user by the name {} was not found.'.format(user_name)
 
 def prepare_lore_cache():
     '''
