@@ -55,11 +55,12 @@ def get_user(user_name):
     if CACHE.get(user_name, None):
         return CACHE[user_name]
     else:
+        user_info = {}
         for platform in platforms:
-            user_name = platforms[platform]
+            gamertag = platforms[platform]
             try:
                 # Get the Destiny membership ID
-                membershipId = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, user_name),
+                membershipId = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
                     headers=HEADERS).json()['Response'][0]['membershipId']
                 # Then get Destiny summary
                 characterHash = get(
@@ -67,9 +68,8 @@ def get_user(user_name):
                     .format(BASE_URL, platform, membershipId),
                     headers=HEADERS).json()['Response']['data']
             except:
-                return 'A user by the name {} was not found.'.format(user_name)
+                return 'A user by the name {} was not found.'.format(gamertag)
 
-            user_info = {}
             character_dict = {}
             for character in characterHash['characters']:
                 character_dict[character['characterBase']['characterId']] = {
@@ -84,8 +84,8 @@ def get_user(user_name):
             }
             user_info[platform] = user_dict
 
-            CACHE[user_name] = user_info
-            return user_info if user_info != {} else 'A user by the name {} was not found.'.format(user_name)
+        CACHE[user_name] = user_info
+        return user_info if user_info != {} else 'A user by the name {} was not found.'.format(user_name)
 
 def prepare_lore_cache():
     '''
