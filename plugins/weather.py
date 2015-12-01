@@ -21,14 +21,14 @@ table = Table(
 # Define some constants
 google_base = 'https://maps.googleapis.com/maps/api/'
 geocode_api = google_base + 'geocode/json'
-
+ 
 wunder_api = "http://api.wunderground.com/api/{}/forecast/geolookup/conditions/q/{}.json"
-
+ 
 # Change this to a ccTLD code (eg. uk, nz) to make results more targeted towards that specific country.
 # <https://developers.google.com/maps/documentation/geocoding/#RegionCodes>
 bias = None
-
-
+ 
+ 
 def check_status(status):
     """
     A little helper function that checks an API error code and returns a nice message.
@@ -46,8 +46,8 @@ def check_status(status):
         return 'Invalid Request.'
     elif status == 'OK':
         return None
-
-
+ 
+ 
 def find_location(location):
     """
     Takes a location as a string, and returns a dict of data
@@ -57,13 +57,13 @@ def find_location(location):
     params = {"address": location, "key": dev_key}
     if bias:
         params['region'] = bias
-
+ 
     json = requests.get(geocode_api, params=params).json()
-
+ 
     error = check_status(json['status'])
     if error:
         raise APIError(error)
-
+ 
     return json['results'][0]['geometry']['location']
 
 def load_cache(db):
@@ -126,40 +126,26 @@ def weather(text, reply, db, nick, notice):
         location_data = find_location(location)
     except APIError as e:
         return e
-
+ 
     formatted_location = "{lat},{lng}".format(**location_data)
-
+ 
     url = wunder_api.format(wunder_key, formatted_location)
     response = requests.get(url).json()
-
+ 
     if response['response'].get('error'):
         return "{}".format(response['response']['error']['description'])
-
-    forecast_today = response["forecast"]["simpleforecast"]["forecastday"][0]
-    forecast_tomorrow = response["forecast"]["simpleforecast"]["forecastday"][1]
-
+ 
+    #forecast_today = response["forecast"]["simpleforecast"]["forecastday"][0]
+    #forecast_tomorrow = response["forecast"]["simpleforecast"]["forecastday"][1]
+ 
     # put all the stuff we want to use in a dictionary for easy formatting of the output
     weather_data = {
         "place": response['current_observation']['display_location']['full'],
         "conditions": response['current_observation']['weather'],
         "temp_f": response['current_observation']['temp_f'],
-        "temp_c": response['current_observation']['temp_c'],
-        "humidity": response['current_observation']['relative_humidity'],
-        "wind_kph": response['current_observation']['wind_kph'],
-        "wind_mph": response['current_observation']['wind_mph'],
-        "wind_direction": response['current_observation']['wind_dir'],
-        "today_conditions": forecast_today['conditions'],
-        "today_high_f": forecast_today['high']['fahrenheit'],
-        "today_high_c": forecast_today['high']['celsius'],
-        "today_low_f": forecast_today['low']['fahrenheit'],
-        "today_low_c": forecast_today['low']['celsius'],
-        "tomorrow_conditions": forecast_tomorrow['conditions'],
-        "tomorrow_high_f": forecast_tomorrow['high']['fahrenheit'],
-        "tomorrow_high_c": forecast_tomorrow['high']['celsius'],
-        "tomorrow_low_f": forecast_tomorrow['low']['fahrenheit'],
-        "tomorrow_low_c": forecast_tomorrow['low']['celsius']
+        "temp_c": response['current_observation']['temp_c']
     }
-
+ 
     # Get the more accurate URL if available, if not, get the generic one.
     if "?query=," in response["current_observation"]['ob_url']:
         try:
