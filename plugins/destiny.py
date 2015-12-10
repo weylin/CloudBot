@@ -564,7 +564,7 @@ def collection(text, nick, bot):
                 ghosts = card['statisticCollection'][0]['displayValue']
                 if int(ghosts) >= 99:
                     ghosts = 99
-        output.append("{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}".format(
+        output.append('{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}'.format(
             CONSOLES[console - 1], grimoire['score'], CACHE['collections']['grim_tally'],
             ghosts, CACHE['collections']['ghost_tally'],
             len(found_frags), len(CACHE['collections']['fragments']))
