@@ -303,84 +303,6 @@ def nightfall(text, bot):
         CACHE['nightfall'] = output
         return output
 
-
-#@hook.command('weekly')
-def weekly(text, bot):
-    if CACHE.get('weekly', None) and not text.lower() == 'flush':
-        if 'last' in text.lower():
-            return CACHE.get('last_weekly', 'Unavailable')
-        else:
-            return CACHE['weekly']
-    else:
-        weeklyHeroicId = get(
-            '{}advisors/?definitions=true'.format(BASE_URL),
-            headers=HEADERS
-        ).json()['Response']['data']['heroicStrike']['activityBundleHash']
-
-        weeklyHeroicDefinition = get(
-            '{}manifest/activity/{}/?definitions=true'
-            .format(BASE_URL, weeklyHeroicId),
-            headers=HEADERS).json()['Response']['data']['activity']
-        weeklyHeroicSkullIndex = weeklyHeroicDefinition['skulls']
-
-        if len(weeklyHeroicSkullIndex) == 2:
-            output = '\x02{}\x02 - \x1D{}\x1D \x02Modifier:\x02 {}'.format(
-                weeklyHeroicDefinition['activityName'],
-                weeklyHeroicDefinition['activityDescription'],
-                weeklyHeroicDefinition['skulls'][1]['displayName']
-            )
-            if output != CACHE['weekly']:
-                CACHE['last_weekly'] = CACHE['weekly']
-            CACHE['weekly'] = output
-            return output
-        else:
-            return 'weylin lied to me, get good scrub.'
-
-
-@hook.command('triumph')
-def triumph(text, nick, bot):
-    text = nick if not text else text
-    triumphText = [
-        '\x02Apprentice of Light\x02 (Max Level)',
-        '\x02Light of the Garden\x02 (Main Story Complete)',
-        '\x02Light in the Dark\x02 (The Dark Below Complete)',
-        '\x02Light of the Reef\x02 (House of Wolves Complete)',
-        '\x02Bane of Skolas\x02 (PoE 35 Complete)',
-        '\x02Bane of Atheon\x02 (HM VoG Complete)',
-        '\x02Bane of Crota\x02 (HM CE Complete)',
-        '\x02Public Servant\x02 (50 Public Events Complete)',
-        '\x02Crucible Gladiator\x02 (Win 100 Crucible Matches)',
-        '\x02Chest Hunter\x02 (Found 20 Golden Chests)',
-    ]
-    membership = get_user(text)
-    if type(membership) == str:
-        return membership
-    output = []
-    for console in membership:
-        triumphHash = get(
-            '{}{}/Account/{}/Triumphs/'
-            .format(BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response']['data']['triumphSets'][0]['triumphs']
-
-        remaining = []
-        for i in range(10):
-            if not triumphHash[i]['complete']:
-                remaining.append(triumphText[i])
-
-        if len(remaining) == 0:
-            output.append(
-                '\x02{}\'s\x02 Year One Triumph is complete on {}!'.format(
-                    text, CONSOLES[console - 1]))
-        else:
-            output.append(
-                '\x02{}\'s\x02 Year One Triumph is not complete on {}. '
-                '\x02Remaining task(s):\x02 {}'.format(
-                    text, CONSOLES[console - 1], ', '.join(remaining)))
-
-    return output
-
-
 @hook.command('xur')
 def xur(text, bot):
     if 'last' in text.lower():
@@ -494,26 +416,6 @@ def lore(text, bot, notice):
 
     return output if len(output) > 5 else lore('', bot, notice)
 
-
-#@hook.command('grim')
-def grim(text, nick, bot):
-    text = nick if not text else text
-    membership = get_user(text)
-    if type(membership) == str:
-        return membership
-    output = []
-    for console in membership:
-        score = get(
-            '{}Vanguard/Grimoire/{}/{}/'
-            .format(BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response']['data']['score']
-        output.append('{}\'s grimoire score on the {} is {} out of {}.'.format(
-            text, CONSOLES[console - 1], score, LORE_CACHE['grim_tally']))
-
-    return output
-
-
 @hook.command('pvp')
 def pvp(text, nick, bot):
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
@@ -569,28 +471,6 @@ def collection(text, nick, bot):
             ghosts, CACHE['collections']['ghost_tally'],
             len(found_frags), len(CACHE['collections']['fragments']))
         )
-    return output
-
-
-#@hook.command('ghosts')
-def ghosts(text, nick, bot):
-    text = nick if not text else text
-    membership = get_user(text)
-    if type(membership) == str:
-        return membership
-    output = []
-    for console in membership:
-        data = get(
-            '{}Vanguard/Grimoire/{}/{}/'
-            .format(BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response']['data']['cardCollection']
-        for card in data:
-            if card['cardId'] == 103094:
-                output.append('{}: {} out of 99'.format(
-                    CONSOLES[console - 1],
-                    card['statisticCollection'][0]['displayValue'])
-                )
     return output
 
 @hook.command('link')
