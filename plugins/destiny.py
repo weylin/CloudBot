@@ -626,7 +626,7 @@ def link(text, nick, bot):
 
 @hook.command('migrate')
 def migrate(text, nick, bot):
-    if nick in ['weylin', 'avcables[PS4]', 'DoctorRaptorMD[XB1]', 'tuzonghua']:
+    if nick in ['weylin', 'avcables', 'DoctorRaptorMD[XB1]', 'tuzonghua']:
         global CACHE
         CACHE = {'links': CACHE['links']}
         return 'Sucessfully migrated! Now run the save command.'
