@@ -636,9 +636,10 @@ def migrate(text, nick, bot):
 @hook.command('purge')
 def purge(text, nick, bot):
     membership = get_user(nick)
+
     if type(membership) is not dict:
         return membership
-    user_name = CACHE['links'].get(nick, nick)
+    user_name = nick
     output = []
     text = '' if not text else text
 
@@ -650,7 +651,7 @@ def purge(text, nick, bot):
         output.append('Removed Playstation from my cache on {}.'.format(user_name))
     if not text or not membership:
         del CACHE[user_name]
-        return 'Removed {} from my cache.'.format(user_name)
+        return 'Removed {}\'s characters from my cache.'.format(nick)
     else:
         CACHE[user_name] = membership
         return output if output else 'Nothing to purge. WTF you doin?!'
