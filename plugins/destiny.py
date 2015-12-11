@@ -656,15 +656,27 @@ def purge(text, nick, bot):
         CACHE[user_name] = membership
         return output if output else 'Nothing to purge. WTF you doin?!'
 
-
 @hook.command('profile')
 def profile(text, nick, bot):
     text = nick if not text else text
     membership = get_user(text)
     if type(membership) is not dict:
         return membership
-    return 'https://www.bungie.net/en/Profile/254/{}'.format(
-        membership.get(1, membership.get(2, None))['userId'])
+
+    if membership.get(1, False):
+        platform = 1
+        membershipId = membership.get(1)['membershipId']
+    elif membership.get(2, False):
+        platform = 2
+        membershipId = membership.get(2)['membershipId']
+    else:
+        return 'No profile!'
+
+    bungieUserId = get(
+        'http://www.bungie.net/Platform/User/GetBungieAccount/{}/{}/'.format(membershipId, platform),
+        headers=HEADERS).json()['Response']['bungieNetUser']['membershipId']
+
+    return 'https://www.bungie.net/en/Profile/254/{}'.format(bungieUserId)
 
 @hook.command('chars')
 def chars(text, nick, bot):
