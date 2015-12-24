@@ -204,6 +204,8 @@ def load_cache(bot):
             CACHE = load(f)  # and the pickles!!!
     except EOFError:
         CACHE = {}
+    except FileNotFoundError:
+        CACHE = {}
     if not CACHE.get('links'):
         CACHE['links'] = {}
     if not CACHE.get('collections'):
@@ -213,6 +215,8 @@ def load_cache(bot):
             global LORE_CACHE
             LORE_CACHE = load(f)  # and the pickles!!!
     except EOFError:
+        LORE_CACHE = {}
+    except FileNotFoundError:
         LORE_CACHE = {}
 
 
@@ -257,7 +261,7 @@ def item_search(text, bot):
     return output[:3]
 
 
-#@hook.command('nightfall')
+@hook.command('nightfall')
 def nightfall(text, bot):
     if CACHE.get('nightfall', None) and not text.lower() == 'flush':
         if 'last' in text.lower():
@@ -265,31 +269,24 @@ def nightfall(text, bot):
         else:
             return CACHE['nightfall']
     else:
-        nightfallActivityId = get(
+        advisors = get(
             '{}advisors/?definitions=true'.format(BASE_URL),
-            headers=HEADERS).json()['Response']['data']['nightfallActivityHash']
+            headers=HEADERS).json()#['Response']['data']['nightfall']
+        nightfallId = advisors['Response']['data']['nightfall']['specificActivityHash']
+        nightfallActivityBundleHashId = advisors['Response']['data']['nightfall']['activityBundleHash']
 
-        nightfallDefinition = get(
-            '{}manifest/activity/{}/?definitions=true'
-            .format(BASE_URL, nightfallActivityId),
-            headers=HEADERS).json()['Response']['data']['activity']
 
-        if len(nightfallDefinition['skulls']) == 5:
-            output = '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}, {}, {}, {}, {}'.format(
-                nightfallDefinition['activityName'],
-                nightfallDefinition['activityDescription'],
-                nightfallDefinition['skulls'][0]['displayName'],
-                nightfallDefinition['skulls'][1]['displayName'],
-                nightfallDefinition['skulls'][2]['displayName'],
-                nightfallDefinition['skulls'][3]['displayName'],
-                nightfallDefinition['skulls'][4]['displayName'],
-            )
-            if output != CACHE['nightfall']:
-                CACHE['last_nightfall'] = CACHE['nightfall']
-            CACHE['nightfall'] = output
-            return output
-        else:
-            return 'weylin lied to me, get good scrub.'
+        nightfallDefinition = advisors['Response']['definitions']['activities'][str(nightfallId)]
+
+        output = '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}'.format(
+            nightfallDefinition['activityName'],
+            nightfallDefinition['activityDescription'],
+            ", ".join([advisors['Response']['definitions']['activities'][str(nightfallActivityBundleHashId)]['skulls'][skullId]['displayName'] for skullId in advisors['Response']['data']['nightfall']['tiers'][0]['skullIndexes']])
+        )
+        if 'nightfall' in CACHE and output != CACHE['nightfall']:
+            CACHE['last_nightfall'] = CACHE['nightfall']
+        CACHE['nightfall'] = output
+        return output
 
 
 #@hook.command('weekly')
