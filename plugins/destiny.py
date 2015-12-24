@@ -192,20 +192,18 @@ def compile_stats(text, nick, bot, opts, defaults, st_type):
         output.append("{}: {}".format(CONSOLES[console - 1], ", ".join(tmp_out)))
     return "; ".join(output)
 
-
 @hook.on_start()
 def load_cache(bot):
-    """Load in our pickle cache and the Headers"""
+    '''Load in our pickle cache and the Headers'''
     global HEADERS
-    HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)}
+    HEADERS = {'X-API-Key': bot.config.get('api_keys', {}).get('destiny', None)}
     try:
         with open('destiny_cache', 'rb') as f:
             global CACHE
             CACHE = load(f)  # and the pickles!!!
     except EOFError:
         CACHE = {}
-    except FileNotFoundError:
-        CACHE = {}
+    CACHE.pop('collections', None)
     if not CACHE.get('links'):
         CACHE['links'] = {}
     if not CACHE.get('collections'):
@@ -216,8 +214,33 @@ def load_cache(bot):
             LORE_CACHE = load(f)  # and the pickles!!!
     except EOFError:
         LORE_CACHE = {}
-    except FileNotFoundError:
-        LORE_CACHE = {}
+
+#@hook.on_start()
+#def load_cache(bot):
+#    """Load in our pickle cache and the Headers"""
+#    global HEADERS
+#    HEADERS = {"X-API-Key": bot.config.get("api_keys", {}).get("destiny", None)}
+#    try:
+#        with open('destiny_cache', 'rb') as f:
+#            global CACHE
+#            CACHE = load(f)  # and the pickles!!!
+#    except EOFError:
+#        CACHE = {}
+#    CACHE.pop('collections', None)
+#    except FileNotFoundError:
+#        CACHE = {}
+#    if not CACHE.get('links'):
+#        CACHE['links'] = {}
+#    if not CACHE.get('collections'):
+#        CACHE['collections'] = {'ghost_tally': 99}
+#    try:
+#        with open('lore_cache', 'rb') as f:
+#            global LORE_CACHE
+#            LORE_CACHE = load(f)  # and the pickles!!!
+#    except EOFError:
+#        LORE_CACHE = {}
+#    except FileNotFoundError:
+#        LORE_CACHE = {}
 
 
 @hook.command('save')
