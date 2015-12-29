@@ -640,6 +640,10 @@ def compare(text, bot):
 def ping(text, bot):
     return 'pong'
 
+@hook.command('ooboo')
+def ooboo(text, bot):
+    return 'https://www.youtube.com/watch?v=HJKW2ZcRtMY'
+
 @hook.command('100')
 def the100(bot):
     return 'Check out our The100.io group here: https://www.the100.io/g/1151'
