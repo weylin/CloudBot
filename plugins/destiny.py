@@ -136,6 +136,9 @@ def get_stat(data, stat):
     elif stat == 'k/h':
         return '\x02k/h\x02: {}'.format(round(data['kills']['basic']['value'] / (
             data['secondsPlayed']['basic']['value'] / 3600), 2))
+    elif stat == 'd/h':
+        return '\x02d/h\x02: {}'.format(round(data['deaths']['basic']['value'] / (
+            data['secondsPlayed']['basic']['value'] / 3600), 2))
     elif stat == 'avgKillDistance':
         return '\x02avgKillDistance\x02: {}m'.format(round(
             data['totalKillDistance']['basic']['value'] / data['kills']['basic']['value'], 2))
@@ -203,6 +206,9 @@ def load_cache(bot):
             CACHE = load(f)  # and the pickles!!!
     except EOFError:
         CACHE = {}
+    except FileNotFoundError:
+        CACHE = {}
+
     CACHE.pop('collections', None)
     if not CACHE.get('links'):
         CACHE['links'] = {}
@@ -213,6 +219,8 @@ def load_cache(bot):
             global LORE_CACHE
             LORE_CACHE = load(f)  # and the pickles!!!
     except EOFError:
+        LORE_CACHE = {}
+    except FileNotFoundError:
         LORE_CACHE = {}
 
 @hook.command('save')
@@ -496,8 +504,8 @@ def grim(text, nick, bot):
 
 @hook.command('pvp')
 def pvp(text, nick, bot):
-    defaults = ['k/d', 'k/h', 'kills', 'bestSingleGameKills', 'longestKillSpree',
-        'bestWeapon', 'secondsPlayed']
+    defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills', 
+        'longestKillSpree', 'bestWeapon', 'secondsPlayed']
     return compile_stats(
         text=text,
         nick=nick,
