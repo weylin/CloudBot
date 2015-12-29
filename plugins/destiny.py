@@ -501,7 +501,7 @@ def grim(text, nick, bot):
 
 @hook.command('pvp')
 def pvp(text, nick, bot):
-    defaults = ['k/d', 'kills', 'bestSingleGameKills', 'longestKillSpree',
+    defaults = ['k/d', 'k/h', 'kills', 'bestSingleGameKills', 'longestKillSpree',
         'bestWeapon', 'secondsPlayed']
     return compile_stats(
         text=text,
