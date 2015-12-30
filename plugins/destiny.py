@@ -568,54 +568,36 @@ def profile(text, nick, bot):
 def chars(text, nick, bot):
     text = nick if not text else text
     text = text.split(' ')
-    if text[0] in ['xbox', 'playstation', '1', '2', '3']:
-        text = [nick] + text
-    text[0] = CACHE['links'].get(text[0], text[0])
-    if type(get_user(text[0])) is not dict:
-        return 'A user by the name {} was not found.'.format(text[0])
-    userID = get('http://www.bungie.net/Platform/User/SearchUsers/?q={}'.format(
-                 text[0].strip()), headers=HEADERS).json()['Response'][0]
-    systems, characters = ([], [])
-    if len(text) > 1:
-        # narrow down our results
-        for x in text[1:]:
-            if x == 'xbox': systems.append(1)
-            if x == 'playstation': systems.append(2)
-            if x in ['1', '2', '3']: characters.append(int(x))
 
-    userHash = get('https://www.bungie.net/platform/User/GetBungieAccount'
-                   '/{}/254/'.format(userID['membershipId']), headers=HEADERS
-               ).json()['Response']['destinyAccounts']
+    if type(get_user(nick)) is not dict:
+        return 'A user by the name {} was not found.'.format(nick)
+
+    # Get character info on all consoles
+    characterHash = get_user(text[0])
+
     output = []
-    for console in userHash:
-        if console['userInfo']['membershipType'] not in systems and systems:
-            continue
+    for console in characterHash:
         console_output = []
-        for i in range(len(console['characters'])):
-            if i + 1 not in characters and characters:
-                continue
-            console['characters'][i]['characterClass']['className'],
+        for char in characterHash[console]['characters']:
             console_output.append('✦{} // {} // {} - {}'.format(
-            console['characters'][i]['powerLevel'],
-            console['characters'][i]['characterClass']['className'],
-            console['characters'][i]['race']['raceName'],
-            try_shorten('https://www.bungie.net/en/Legend/Gear/{}/{}/{}'.format(
-                console['userInfo']['membershipType'],
-                console['userInfo']['membershipId'],
-                console['characters'][i]['characterId']
+                characterHash[console]['characters'][char]['LL'],
+                characterHash[console]['characters'][char]['class'],
+                characterHash[console]['characters'][char]['race'],
+                try_shorten('https://www.bungie.net/en/Legend/Gear/{}/{}/{}'.format(
+                    console,
+                    characterHash[console]['membershipId'],
+                    char
+                ))
             ))
-        ))
         output.append('{}: {}'.format(
-            CONSOLES[console['userInfo']['membershipType'] - 1],
+            CONSOLES[console - 1],
             ' || '.join(console_output)
         ))
     return ' ; '.join(output)
 
-
 @hook.command('rules')
 def rules(bot):
     return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
-
 
 @hook.command('compare')
 def compare(text, bot):
