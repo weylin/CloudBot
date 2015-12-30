@@ -499,11 +499,11 @@ def link(text, nick, bot):
     if platform not in ['psn', 'xbl']: # Check for a valid console
         return err_msg
     elif platform == 'psn':
-        CACHE[nick].pop(2, None) # Remove any previous cached char info
+        CACHE[nick] = {} # Remove any previous cached char info
         CACHE['links'][nick][2] = gamertag
         return '{} linked to {} on PSN'.format(gamertag, nick)
     elif platform == 'xbl':
-        CACHE[nick].pop(1, None)
+        CACHE[nick] = {}
         CACHE['links'][nick][1] = gamertag
         return '{} linked to {} on XBL'.format(gamertag, nick)
     else:
