@@ -74,6 +74,7 @@ def get_user(user_name):
             for character in characterHash['characters']:
                 character_dict[character['characterBase']['characterId']] = {
                     'level': character['characterLevel'],
+                    'LL': character['characterBase']['powerLevel'],
                     'race': RACE_HASH[character['characterBase']['raceHash']],
                     'class': CLASS_HASH[character['characterBase']['classHash']]
                 }
