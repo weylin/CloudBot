@@ -510,7 +510,7 @@ def link(text, nick, bot):
 
     # If nick doesn't exist in cache, or we flush, reset cache value
     if not CACHE['links'].get(nick, None) or 'flush' in text:
-        CACHE['links'][nick] = {}
+        CACHE['links'].pop(nick, None)
 
     # Only give flush message if we flush
     if 'flush' in text:
@@ -522,9 +522,11 @@ def link(text, nick, bot):
     if platform not in ['psn', 'xbl']: # Check for a valid console
         return err_msg
     elif platform == 'psn':
+        CACHE[nick].pop(2, None) # Remove any previous cached char info
         CACHE['links'][nick][2] = gamertag
         return '{} linked to {} on PSN'.format(gamertag, nick)
     elif platform == 'xbl':
+        CACHE[nick].pop(1, None)
         CACHE['links'][nick][1] = gamertag
         return '{} linked to {} on XBL'.format(gamertag, nick)
     else:
