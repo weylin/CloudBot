@@ -487,7 +487,7 @@ def link(text, nick, bot):
 
     # If nick doesn't exist in cache, or we flush, reset cache value
     if not CACHE['links'].get(nick, None) or 'flush' in text:
-        CACHE['links'].pop(nick, None)
+        CACHE['links'][nick] = {}
 
     # Only give flush message if we flush
     if 'flush' in text:
