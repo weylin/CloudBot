@@ -503,6 +503,10 @@ def link(text, nick, bot):
     if not 0 < len(text) < 3 or text[0] == '':
         return err_msg
 
+    # Check that single arg is correct
+    if len(text) == 1 and text[0] not in 'flush':
+        return err_msg
+
     # If nick doesn't exist in cache, or we flush, reset cache value
     if not CACHE['links'].get(nick, None) or 'flush' in text:
         CACHE['links'][nick] = {}
