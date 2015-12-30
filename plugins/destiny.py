@@ -166,7 +166,35 @@ def get_stat(data, stat):
     else:
         return 'Invalid option {}'.format(stat)
 
+@hook.on_start()
+def load_cache(bot):
+    '''Load in our pickle cache and the Headers'''
+    global HEADERS
+    HEADERS = {'X-API-Key': bot.config.get('api_keys', {}).get('destiny', None)}
+    try:
+        with open('destiny_cache', 'rb') as f:
+            global CACHE
+            CACHE = load(f)  # and the pickles!!!
+    except EOFError:
+        CACHE = {}
+    except FileNotFoundError:
+        CACHE = {}
 
+    CACHE.pop('collections', None)
+    if not CACHE.get('links'):
+        CACHE['links'] = {}
+    if not CACHE.get('collections'):
+        CACHE['collections'] = {'ghost_tally': 99}
+    try:
+        with open('lore_cache', 'rb') as f:
+            global LORE_CACHE
+            LORE_CACHE = load(f)  # and the pickles!!!
+    except EOFError:
+        LORE_CACHE = {}
+    except FileNotFoundError:
+        LORE_CACHE = {}
+
+# Test this to make sure it takes a console arg and uses it correctly
 def compile_stats(text, nick, bot, opts, defaults, st_type):
     if not text:
         text = nick
@@ -208,33 +236,31 @@ def compile_stats(text, nick, bot, opts, defaults, st_type):
         output.append('{}: {}'.format(CONSOLES[console - 1], ', '.join(tmp_out)))
     return '; '.join(output)
 
-@hook.on_start()
-def load_cache(bot):
-    '''Load in our pickle cache and the Headers'''
-    global HEADERS
-    HEADERS = {'X-API-Key': bot.config.get('api_keys', {}).get('destiny', None)}
-    try:
-        with open('destiny_cache', 'rb') as f:
-            global CACHE
-            CACHE = load(f)  # and the pickles!!!
-    except EOFError:
-        CACHE = {}
-    except FileNotFoundError:
-        CACHE = {}
+@hook.command('pvp')
+def pvp(text, nick, bot):
+    defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
+        'longestKillSpree', 'bestWeapon', 'secondsPlayed']
+    return compile_stats(
+        text=text,
+        nick=nick,
+        bot=bot,
+        opts=PVP_OPTS,
+        defaults=defaults,
+        st_type='allPvP'
+    )
 
-    CACHE.pop('collections', None)
-    if not CACHE.get('links'):
-        CACHE['links'] = {}
-    if not CACHE.get('collections'):
-        CACHE['collections'] = {'ghost_tally': 99}
-    try:
-        with open('lore_cache', 'rb') as f:
-            global LORE_CACHE
-            LORE_CACHE = load(f)  # and the pickles!!!
-    except EOFError:
-        LORE_CACHE = {}
-    except FileNotFoundError:
-        LORE_CACHE = {}
+@hook.command('pve')
+def pve(text, nick, bot):
+    defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
+        'bestWeapon', 'secondsPlayed']
+    return compile_stats(
+        text=text,
+        nick=nick,
+        bot=bot,
+        opts=PVE_OPTS,
+        defaults=defaults,
+        st_type='allPvE'
+    )
 
 @hook.command('save')
 def save_cache():
@@ -416,34 +442,6 @@ def lore(text, bot, notice):
             output[:301], contents['cardId'])
 
     return output if len(output) > 5 else lore('', bot, notice)
-
-@hook.command('pvp')
-def pvp(text, nick, bot):
-    defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
-        'longestKillSpree', 'bestWeapon', 'secondsPlayed']
-    return compile_stats(
-        text=text,
-        nick=nick,
-        bot=bot,
-        opts=PVP_OPTS,
-        defaults=defaults,
-        st_type='allPvP'
-    )
-
-
-@hook.command('pve')
-def pve(text, nick, bot):
-    defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
-        'bestWeapon', 'secondsPlayed']
-    return compile_stats(
-        text=text,
-        nick=nick,
-        bot=bot,
-        opts=PVE_OPTS,
-        defaults=defaults,
-        st_type='allPvE'
-    )
-
 
 @hook.command('collection')
 def collection(text, nick, bot):
