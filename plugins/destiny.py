@@ -565,15 +565,33 @@ def profile(text, nick, bot):
     return 'https://www.bungie.net/en/Profile/254/{}'.format(bungieUserId)
 
 @hook.command('chars')
-def chars(text, nick, bot):
+def chars(text, nick, bot, notice):
     text = nick if not text else text
     text = text.split(' ')
 
-    if type(get_user(nick)) is not dict:
-        return 'A user by the name {} was not found.'.format(nick)
+    err_msg = 'Invalid use of chars command. Use: !chars <nick> or !chars <gamertag> <playstation/xbox>'
 
-    # Get character info on all consoles
-    characterHash = get_user(text[0])
+    # ALL THE ERROR HANDLING!!!
+    if len(set(['1','2','3']).intersection(set(text))) >= 1: # Check that user isn't getting an individual character
+        notice(err_msg)
+        return
+    elif len(text) == 2 and text[1] not in ['xbox', 'playstation']: # Check that query for non-linked tag is correct
+        notice(err_msg)
+        return
+    elif len(text) > 2: # Don't be silly
+        notice(err_msg)
+        return
+
+    # Check if input is for non-linked gamertag
+    if len(text) > 1 and text[1] == 'xbox':
+        characterHash = get_user(text[0], console=1)
+    elif len(text) > 1 and text[1] == 'playstation':
+        characterHash = get_user(text[0], console=2)
+    else:
+        characterHash = get_user(text[0])
+
+    if type(characterHash) is not dict:
+        return 'A user by the name {} was not found.'.format(text[0])
 
     output = []
     for console in characterHash:
