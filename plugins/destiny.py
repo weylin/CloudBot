@@ -45,12 +45,12 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data().replace('\n', '\t')
 
-def get_user(user_name):
+def get_user(user_name, console=None):
     '''
     Takes in a username and returns a dictionary of all systems they are
     on as well as their associated id for that system, plus general information
     '''
-    platforms = CACHE['links'].get(user_name, user_name)
+    platforms = CACHE['links'].get(user_name, {console: user_name})
 
     if CACHE.get(user_name, None):
         return CACHE[user_name]
