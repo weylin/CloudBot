@@ -473,17 +473,19 @@ def collection(text, nick, bot):
     return output
 
 @hook.command('link')
-def link(text, nick, bot):
+def link(text, nick, bot, notice):
     text = text.lower().split(' ')
-    err_msg = 'Invalid use of link command. Use: !link <gamertag> <xbl or psn>'
+    err_msg = 'Invalid use of link command. Use: !link <gamertag> <xbox/playstation>'
 
     # Check for right number of args
     if not 0 < len(text) < 3 or text[0] == '':
-        return err_msg
+        notice(err_msg)
+        return
 
     # Check that single arg is correct
     if len(text) == 1 and text[0] not in 'flush':
-        return err_msg
+        notice(err_msg)
+        return
 
     # Remove any previous cached char info
     CACHE[nick] = {}
@@ -499,16 +501,18 @@ def link(text, nick, bot):
     platform = text[1]
     gamertag = text[0]
 
-    if platform not in ['psn', 'xbl']: # Check for a valid console
-        return err_msg
-    elif platform == 'psn':
+    if platform not in ['playstation', 'xbox']: # Check for a valid console
+        notice(err_msg)
+        return
+    elif platform == 'playstation':
         CACHE['links'][nick][2] = gamertag
-        return '{} linked to {} on PSN'.format(gamertag, nick)
-    elif platform == 'xbl':
+        return '{} linked to {} on Playstation'.format(gamertag, nick)
+    elif platform == 'xbox':
         CACHE['links'][nick][1] = gamertag
-        return '{} linked to {} on XBL'.format(gamertag, nick)
+        return '{} linked to {} on Xbox'.format(gamertag, nick)
     else:
-        return err_msg
+        notice(err_msg)
+        return
 
 @hook.command('migrate')
 def migrate(text, nick, bot):
