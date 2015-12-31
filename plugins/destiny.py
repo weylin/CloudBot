@@ -194,19 +194,32 @@ def load_cache(bot):
     except FileNotFoundError:
         LORE_CACHE = {}
 
-# Test this to make sure it takes a console arg and uses it correctly
 def compile_stats(text, nick, bot, opts, defaults, st_type):
     if not text:
         text = nick
     text = text.split(' ')
+
+    # Do you need help?
     if text[0].lower() == 'help':
         return 'options: {}'.format(', '.join(opts + WEAPON_TYPES))
     elif text[0] in opts or text[0] in WEAPON_TYPES:
         text = [nick] + text
-    membership = get_user(text[0])
+
+    # Check if input is for non-linked gamertag
+    if len(text) > 1 and text[1] == 'xbox':
+        membership = get_user(text[0], console=1)
+    elif len(text) > 1 and text[1] == 'playstation':
+        membership = get_user(text[0], console=2)
+    else:
+        membership = get_user(text[0])
+
+    unlinked = True if len(text) > 1 and text[1] in ['xbox', 'playstation'] else False
+
     if type(membership) == str:
         return membership
-    if len(text) == 1:  # if no stats are specified, add some
+
+    # if no stats are specified, add some
+    if len(text) == 1 or (len(text) == 2 and text[1] in ['xbox', 'playstation']):
         text.extend(defaults)
     split = True if 'split' in text else False
     path = 'characters' if split else 'mergedAllCharacters'
@@ -219,7 +232,20 @@ def compile_stats(text, nick, bot, opts, defaults, st_type):
             headers=HEADERS
         ).json()['Response'][path]
         tmp_out = []
-        if split:
+        if unlinked and not split:
+            data = data['results'][st_type]['allTime']
+            for stat in text[2:]:
+                tmp_out.append(get_stat(data, stat))
+        elif unlinked and split:
+            if text[2] not in opts and text[2] not in WEAPON_TYPES:
+                return 'I can\'t split {}. Try another option.'.format(text[1])
+            for character in data:
+                if not character['deleted'] and character['results'][st_type].get('allTime', False):
+                    tmp_out.append('\x02{}\x02 {}'.format(
+                        membership[console]['characters'][character['characterId']]['class'],
+                        get_stat(character['results'][st_type]['allTime'], text[2])
+                    ))
+        elif not unlinked and split:
             if text[1] not in opts and text[1] not in WEAPON_TYPES:
                 return 'I can\'t split {}. Try another option.'.format(text[1])
             for character in data:
@@ -323,7 +349,7 @@ def nightfall(text, bot):
         output = '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {}'.format(
             nightfallDefinition['activityName'],
             nightfallDefinition['activityDescription'],
-            ", ".join([advisors['Response']['definitions']['activities'][str(nightfallActivityBundleHashId)]['skulls'][skullId]['displayName'] for skullId in advisors['Response']['data']['nightfall']['tiers'][0]['skullIndexes']])
+            ', '.join([advisors['Response']['definitions']['activities'][str(nightfallActivityBundleHashId)]['skulls'][skullId]['displayName'] for skullId in advisors['Response']['data']['nightfall']['tiers'][0]['skullIndexes']])
         )
         if 'nightfall' in CACHE and output != CACHE['nightfall']:
             CACHE['last_nightfall'] = CACHE['nightfall']
