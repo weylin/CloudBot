@@ -130,6 +130,14 @@ def get_stat(data, stat):
     if stat in data:
         return '\x02{}\x02: {}'.format(
             data[stat]['statId'], data[stat]['basic']['displayValue'])
+    elif stat.endswith("Percentage"):
+        orig_stat = stat[:-len("Percentage")]
+        if orig_stat in WEAPON_TYPES:
+            orig_stat = "weaponKills{0}".format(orig_stat)
+            return '\x02{0}\x02: {1}%'.format(stat, round( (data[orig_stat]['basic']['value'] / 
+                                                            data['kills']['basic']['value']) * 100, 2))
+        else:
+            return "Invalid percentage stat request {0}".format(orig_stat)
     elif stat == 'k/d':
         return '\x02k/d\x02: {}'.format(round(
             data['kills']['basic']['value'] / data['deaths']['basic']['value'], 2))
@@ -160,7 +168,7 @@ def compile_stats(text, nick, bot, opts, defaults, st_type):
     text = text.split(" ")
     if text[0].lower() == 'help':
         return 'options: {}'.format(", ".join(opts + WEAPON_TYPES))
-    elif text[0] in opts or text[0] in WEAPON_TYPES:
+    elif text[0] in opts or text[0] in WEAPON_TYPES or text[0].endswith("Percentage"):
         text = [nick] + text
     membership = get_user(text[0])
     if type(membership) == str:
