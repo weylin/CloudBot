@@ -262,6 +262,49 @@ def compile_stats(text, nick, bot, opts, defaults, st_type):
         output.append('{}: {}'.format(CONSOLES[console - 1], ', '.join(tmp_out)))
     return '; '.join(output)
 
+# Sample input:
+# ['k/d', 'split']
+# ['tuzonghua', 'xbox']
+# ['tuzonghua']
+def parse(text_arr, given_nick):
+    '''Parse the input
+
+    :param textArr: the input text array to parse
+    :type  textArr: string
+    :param nick: the nick to get stats on
+    :type nick: string
+
+    :returns: a dictionary of values to use
+    :rtype: dictionary of strings
+    '''
+
+    CONSOLES = ['xbox','playstation']
+    nick = ''
+    console = None
+    collect = []
+
+    # Nick/console
+    check_arg = text_arr.pop(0)
+    if check_arg in CONSOLES or check_arg in WEAPON_TYPES:
+        nick = given_nick
+        if check_arg in CONSOLES:
+            console = check_arg
+            collect = text_arr[1:]
+        else:
+            collect = text_arr[:]
+    else:
+        nick = check_arg
+        check_arg = text_arr.pop(0)
+        if check_arg in CONSOLES:
+            console = check_arg
+            collect = text_arr
+        else:
+            collect = [check_arg] + text_arr
+
+    return_dict = {'nick': nick, 'console': console, 'stats': collect}
+    print('parse dict: {}'.format(return_dict))
+
+
 @hook.command('pvp')
 def pvp(text, nick, bot):
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
