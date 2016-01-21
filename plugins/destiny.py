@@ -20,6 +20,12 @@ HEADERS = {}
 WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
     'HandCannon', 'Machinegun', 'PulseRifle', 'RocketLauncher', 'ScoutRifle',
     'Shotgun', 'Sniper', 'Submachinegun', 'Relic', 'SideArm']
+WEAPON_CLASSES = {"PrimaryWeapon": ['HandCannon', 'AutoRifle', 'PulseRifle',
+                                    'ScoutRifle'],
+                  "SpecialWeapon": ['FusionRifle', 'Shotgun', 'Sniper', 'SideArm'],
+                  "HeavyWeapon": ['Machinegun', 'Submachinegun', 'RocketLauncher',
+                                  'Relic'],
+                  "Ability": ['Super', 'Melee', 'Grenade']}
 PVP_OPTS = ['activitiesEntered', 'assists', 'avgKillDistance', 'deaths', 'kills', 'k/d',
     'bestSingleGameKills', 'bestSingleGameScore', 'bestWeapon', 'longestKillSpree',
     'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
@@ -86,7 +92,7 @@ def get_user(user_name, console=None):
             user_info[platform] = user_dict
 
         CACHE[user_name] = user_info
-        return user_info if user_info != {} else 'A user by the name {} was not found.'.format(user_name)
+        return user_info if user_info else 'A user by the name {} was not found.'.format(user_name)
 
 def prepare_lore_cache():
     '''
@@ -129,6 +135,17 @@ def best_weapon(data):
     return '{}: {} kills'.format(
         weapon[11:], round(best)) if best else 'You ain\'t got no best weapon!'
 
+def get_weaponclass_total(data, weapon_class):
+    # TODO: No Land Beyond, Universal Remote, Sleeper Simulant, etc.
+    if weapon_class in WEAPON_CLASSES:
+        weaponclass_kills = 0
+        for primitive_stat in WEAPON_CLASSES[weapon_class]:
+            raw_stat = "weaponKills{0}".format(primitive_stat)
+            weaponclass_kills += data[raw_stat]['basic']['value']
+        return weaponclass_kills
+    else:
+        return None
+
 def get_stat(data, stat):
     if stat in WEAPON_TYPES:
         stat = 'weaponKills{}'.format(stat)
@@ -141,8 +158,13 @@ def get_stat(data, stat):
             orig_stat = "weaponKills{0}".format(orig_stat)
             return '\x02{0}\x02: {1}%'.format(stat, round( (data[orig_stat]['basic']['value'] /
                                                             data['kills']['basic']['value']) * 100, 2))
+        elif orig_stat in WEAPON_CLASSES:
+            return '\x02{0}\x02: {1}%'.format(stat, round( (get_weaponclass_total(data, orig_stat) /
+                                                            data['kills']['basic']['value']) * 100, 2))
         else:
             return "Invalid percentage stat request {0}".format(orig_stat)
+    elif stat in WEAPON_CLASSES:
+        return '\x02{0}\x02: {1}'.format(stat, get_weaponclass_total(data, stat))
     elif stat == 'k/d':
         return '\x02k/d\x02: {}'.format(round(
             data['kills']['basic']['value'] / data['deaths']['basic']['value'], 2))
@@ -194,79 +216,63 @@ def load_cache(bot):
     except FileNotFoundError:
         LORE_CACHE = {}
 
-def compile_stats(text, nick, bot, opts, defaults, st_type):
+def compile_stats(text, nick, bot, opts, defaults, st_type, notice):
     if not text:
         text = nick
     text = text.split(' ')
+    CONSOLE_MAP = {"xbox": 1, "playstation": 2}
 
     # Do you need help?
     if text[0].lower() == 'help':
-        return 'options: {}'.format(', '.join(opts + WEAPON_TYPES))
-    elif text[0] in opts or text[0] in WEAPON_TYPES:
-        text = [nick] + text
+        notice('options: {}'.format(', '.join(opts + WEAPON_TYPES)))
+        return
 
-    # Check if input is for non-linked gamertag
-    if len(text) > 1 and text[1] == 'xbox':
-        membership = get_user(text[0], console=1)
-    elif len(text) > 1 and text[1] == 'playstation':
-        membership = get_user(text[0], console=2)
-    else:
-        membership = get_user(text[0])
+    target = compile_stats_arg_parse(text, nick)
 
-    unlinked = True if len(text) > 1 and text[1] in ['xbox', 'playstation'] else False
-
-    if type(membership) == str:
-        return membership
+    membership = target['user']
 
     # if no stats are specified, add some
-    if len(text) == 1 or (len(text) == 2 and text[1] in ['xbox', 'playstation']):
-        text.extend(defaults)
-    split = True if 'split' in text else False
+    if not target['stats']:
+        target['stats'] = defaults
+    split = target['split']
     path = 'characters' if split else 'mergedAllCharacters'
 
     output = []
     for console in membership:
+        # If a console has been specified, grab only that console
+        if target['console'] and console != CONSOLE_MAP[target['console']]:
+            continue
+
+        # Get stats
         data = get(
             '{}Stats/Account/{}/{}/'.format(
                 BASE_URL, console, membership[console]['membershipId']),
             headers=HEADERS
         ).json()['Response'][path]
         tmp_out = []
-        if unlinked and not split:
-            data = data['results'][st_type]['allTime']
-            for stat in text[2:]:
-                tmp_out.append(get_stat(data, stat))
-        elif unlinked and split:
-            if text[2] not in opts and text[2] not in WEAPON_TYPES:
-                return 'I can\'t split {}. Try another option.'.format(text[1])
-            for character in data:
-                if not character['deleted'] and character['results'][st_type].get('allTime', False):
-                    tmp_out.append('\x02{}\x02 {}'.format(
-                        membership[console]['characters'][character['characterId']]['class'],
-                        get_stat(character['results'][st_type]['allTime'], text[2])
-                    ))
-        elif not unlinked and split:
-            if text[1] not in opts and text[1] not in WEAPON_TYPES:
-                return 'I can\'t split {}. Try another option.'.format(text[1])
-            for character in data:
-                if not character['deleted'] and character['results'][st_type].get('allTime', False):
-                    tmp_out.append('\x02{}\x02 {}'.format(
-                        membership[console]['characters'][character['characterId']]['class'],
-                        get_stat(character['results'][st_type]['allTime'], text[1])
-                    ))
+        if not split:
+            try:
+                data = data['results'][st_type]['allTime']
+                for stat in target['stats']:
+                    tmp_out.append(get_stat(data, stat))
+            except KeyError:
+                return "Data not available yet."
         else:
-            data = data['results'][st_type]['allTime']
-            for stat in text[1:]:
-                tmp_out.append(get_stat(data, stat))
+            for character in data:
+                if not character['deleted'] and character['results'][st_type].get('allTime', False):
+                    tmp_out.append('\x02{}\x02 {}'.format(
+                        membership[console]['characters'][character['characterId']]['class'],
+                        " / ".join([get_stat(character['results'][st_type]['allTime'], stat) for stat in target['stats']])
+                    ))
 
         output.append('{}: {}'.format(CONSOLES[console - 1], ', '.join(tmp_out)))
-    return '; '.join(output)
+    return '\x02{0}\x02: {1}'.format(target['nick'], '; '.join(output))
 
 # Sample input:
 # ['k/d', 'split']
 # ['tuzonghua', 'xbox']
 # ['tuzonghua']
-def parse(text_arr, given_nick):
+def compile_stats_arg_parse(text_arr, given_nick):
     '''Parse the input
 
     :param textArr: the input text array to parse
@@ -278,35 +284,58 @@ def parse(text_arr, given_nick):
     :rtype: dictionary of strings
     '''
 
-    CONSOLES = ['xbox','playstation']
+    CONSOLES = {"xbl": "xbox", "psn": "playstation"}
+    CONSOLE2ID = {"xbox": 1, "playstation": 2}
     nick = ''
+    user = None
     console = None
     collect = []
+    split = False
 
     # Nick/console
-    check_arg = text_arr.pop(0)
-    if check_arg in CONSOLES or check_arg in WEAPON_TYPES:
-        nick = given_nick
-        if check_arg in CONSOLES:
-            console = check_arg
-            collect = text_arr[1:]
-        else:
-            collect = text_arr[:]
-    else:
-        nick = check_arg
-        check_arg = text_arr.pop(0)
-        if check_arg in CONSOLES:
-            console = check_arg
-            collect = text_arr
-        else:
-            collect = [check_arg] + text_arr
+    args = text_arr[:]
+    while args:
+        check_arg = args.pop(0)
+        if check_arg in CONSOLES and not console:
+            console = CONSOLES[check_arg]
+            if user:
+                # better run it again
+                user = get_user(nick, CONSOLE2ID[console])
+        elif check_arg == 'split':
+            split = True
+        elif not nick:
+            if console:
+                # perfect, we can just return the user for it
+                t = get_user(check_arg, CONSOLE2ID[console])
+            else:
+                # not perfect, but give it a shot
+                t = get_user(check_arg)
 
-    return_dict = {'nick': nick, 'console': console, 'stats': collect}
-    print('parse dict: {}'.format(return_dict))
+            if not isinstance(t, str):
+                # XXX: Right now, the only string returned is "A user by
+                # the name (nick) can't be found." So 'string' return
+                # type means that's the case; anything else is real,
+                # valid, good data.
+                user = t
+                nick = check_arg
+            else:
+                # not split, not nick, not console
+                # must be collect
+                collect.append(check_arg)
+        else:
+            collect.append(check_arg)
+
+    # If we didn't get a nick, assume the requester.
+    if not nick:
+        user = get_user(given_nick, CONSOLE2ID[console]) if console else get_user(given_nick)
+        nick = given_nick
+
+    return_dict = {'user': user, 'nick': nick, 'console': console, 'stats': collect, 'split': split}
+    return return_dict
 
 
 @hook.command('pvp')
-def pvp(text, nick, bot):
+def pvp(text, nick, bot, notice):
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
         'longestKillSpree', 'bestWeapon', 'secondsPlayed']
     return compile_stats(
@@ -315,11 +344,12 @@ def pvp(text, nick, bot):
         bot=bot,
         opts=PVP_OPTS,
         defaults=defaults,
-        st_type='allPvP'
+        st_type='allPvP',
+        notice=notice
     )
 
 @hook.command('pve')
-def pve(text, nick, bot):
+def pve(text, nick, bot, notice):
     defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
         'bestWeapon', 'secondsPlayed']
     return compile_stats(
@@ -328,7 +358,8 @@ def pve(text, nick, bot):
         bot=bot,
         opts=PVE_OPTS,
         defaults=defaults,
-        st_type='allPvE'
+        st_type='allPvE',
+        notice=notice
     )
 
 @hook.command('save')
@@ -528,6 +559,10 @@ def collection(text, nick, bot):
         found_frags = []
         ghosts = 0
         for card in grimoire['cardCollection']:
+            if 'fragments' not in CACHE['collections']:
+                # XXX: don't allow !collections to be broken
+                # because of bad cache
+                prepare_lore_cache()
             if card['cardId'] in CACHE['collections']['fragments']:
                 found_frags.append([card['cardId']])
             elif card['cardId'] == 103094:
@@ -544,7 +579,7 @@ def collection(text, nick, bot):
 @hook.command('link')
 def link(text, nick, bot, notice):
     text = text.lower().split(' ')
-    err_msg = 'Invalid use of link command. Use: !link <gamertag> <xbox/playstation>'
+    err_msg = 'Invalid use of link command. Use: !link <gamertag> <xbl/psn>'
 
     # Check for right number of args
     if not 0 < len(text) < 3 or text[0] == '':
@@ -570,13 +605,13 @@ def link(text, nick, bot, notice):
     platform = text[1]
     gamertag = text[0]
 
-    if platform not in ['playstation', 'xbox']: # Check for a valid console
+    if platform not in ['psn', 'xbl']: # Check for a valid console
         notice(err_msg)
         return
-    elif platform == 'playstation':
+    elif platform == 'psn':
         CACHE['links'][nick][2] = gamertag
         return '{} linked to {} on Playstation'.format(gamertag, nick)
-    elif platform == 'xbox':
+    elif platform == 'xbl':
         CACHE['links'][nick][1] = gamertag
         return '{} linked to {} on Xbox'.format(gamertag, nick)
     else:
@@ -602,10 +637,10 @@ def purge(text, nick, bot):
     output = []
     text = '' if not text else text
 
-    if text.lower() == 'xbox' and membership.get(1, False):
+    if text.lower() == 'xbl' and membership.get(1, False):
         del membership[1]
         output.append('Removed Xbox from my cache on {}.'.format(user_name))
-    if text.lower() == 'playstation' and membership.get(2, False):
+    if text.lower() == 'psn' and membership.get(2, False):
         del membership[2]
         output.append('Removed Playstation from my cache on {}.'.format(user_name))
     if not text or not membership:
@@ -641,33 +676,24 @@ def profile(text, nick, bot):
 def chars(text, nick, bot, notice):
     text = nick if not text else text
     text = text.split(' ')
+    CONSOLE2ID = {"xbox": 1, "playstation": 2}
 
-    err_msg = 'Invalid use of chars command. Use: !chars <nick> or !chars <gamertag> <playstation/xbox>'
+    err_msg = 'Invalid use of chars command. Use: !chars <nick> or !chars <gamertag> <psn/xbl>'
 
-    # ALL THE ERROR HANDLING!!!
-    if len(set(['1','2','3']).intersection(set(text))) >= 1: # Check that user isn't getting an individual character
-        notice(err_msg)
-        return
-    elif len(text) == 2 and text[1] not in ['xbox', 'playstation']: # Check that query for non-linked tag is correct
-        notice(err_msg)
-        return
-    elif len(text) > 2: # Don't be silly
-        notice(err_msg)
-        return
+    target = compile_stats_arg_parse(text, nick)
+    if target['stats'] or target['split']:
+        return err_msg
 
-    # Check if input is for non-linked gamertag
-    if len(text) > 1 and text[1] == 'xbox':
-        characterHash = get_user(text[0], console=1)
-    elif len(text) > 1 and text[1] == 'playstation':
-        characterHash = get_user(text[0], console=2)
-    else:
-        characterHash = get_user(text[0])
+    characterHash = target['user']
 
     if type(characterHash) is not dict:
         return 'A user by the name {} was not found.'.format(text[0])
 
     output = []
     for console in characterHash:
+        if target['console'] and CONSOLE2ID[target['console']] != console:
+            print("{0} is not {1}".format(console, target['console']))
+            continue
         console_output = []
         for char in characterHash[console]['characters']:
             console_output.append('✦{} // {} // {} - {}'.format(
@@ -684,7 +710,7 @@ def chars(text, nick, bot, notice):
             CONSOLES[console - 1],
             ' || '.join(console_output)
         ))
-    return ' ; '.join(output)
+    return "\x02{0}\x02: {1}".format(target['nick'], ' ; '.join(output))
 
 @hook.command('rules')
 def rules(bot):
