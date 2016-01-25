@@ -124,14 +124,20 @@ def spawn_event(message, bot):
     active = GAME['game_on']
     event_status = GAME['event_status']
     next_event = GAME['event_time']
-    if active is True and event_status is False and next_event <= time():
-        GAME['event_status'] = True
-        GAME['event_time'] = time()
-        lt, eb, rt = generate_event()
-        GAME['event_type'] = eb
-        GAME['players_linked'] = []
-        conn = bot.connections[GAME['network']]
-        conn.message(GAME['channel'], '{}{}{}'.format(lt, eb, rt))
+    if active is True:
+        if event_status is False and next_event <= time():
+            GAME['event_status'] = True
+            GAME['event_time'] = time()
+            lt, eb, rt = generate_event()
+            GAME['event_type'] = eb
+            GAME['players_linked'] = []
+            conn = bot.connections[GAME['network']]
+            conn.message(GAME['channel'], '{}{}{}'.format(lt, eb, rt))
+        elif event_status is True:
+            if time() - GAME['event_time'] >= 120:
+                GAME['event_status'] = False
+                conn.message(GAME['channel'], "The Darkness subsides.")
+                set_event_time()
 
 
 @hook.command("bang", autohelp=False)

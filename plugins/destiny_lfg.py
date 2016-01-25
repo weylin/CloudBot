@@ -46,9 +46,9 @@ def session_info(session):
 @hook.on_start()
 def load_data(bot):
     """Load in our pickled content"""
+    global SESSIONS, MEMBERS, SHERPAS, SESSION_COUNT
     try:
         with open('destiny_lfg', 'rb') as f:
-            global SESSIONS, MEMBERS, SHERPAS, SESSION_COUNT
             SESSIONS = load(f)
             MEMBERS = load(f)
             SHERPAS = load(f)
