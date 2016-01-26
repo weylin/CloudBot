@@ -216,7 +216,7 @@ def load_cache(bot):
     except FileNotFoundError:
         LORE_CACHE = {}
 
-def compile_stats(text, nick, bot, opts, defaults, st_type, notice):
+def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, notice):
     if not text:
         text = nick
     text = text.split(' ')
@@ -233,7 +233,7 @@ def compile_stats(text, nick, bot, opts, defaults, st_type, notice):
 
     # if no stats are specified, add some
     if not target['stats']:
-        target['stats'] = defaults
+        target['stats'] = defaults if not target['split'] else split_defaults
     split = target['split']
     path = 'characters' if split else 'mergedAllCharacters'
 
@@ -301,6 +301,15 @@ def compile_stats_arg_parse(text_arr, given_nick):
             if user:
                 # better run it again
                 user = get_user(nick, CONSOLE2ID[console])
+            elif collect:
+                # gamertag may have been given, try it
+                for i, arg in enumerate(collect):
+                    user = get_user(arg, CONSOLE2ID[console])
+                    if not isinstance(user, str):
+                        # Gamertag given, found, remove it. 
+                        collect.pop(i)
+                        nick = arg
+                        break
         elif check_arg == 'split':
             split = True
         elif not nick:
@@ -338,12 +347,14 @@ def compile_stats_arg_parse(text_arr, given_nick):
 def pvp(text, nick, bot, notice):
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
         'longestKillSpree', 'bestWeapon', 'secondsPlayed']
+    split_defaults = ['k/d']
     return compile_stats(
         text=text,
         nick=nick,
         bot=bot,
         opts=PVP_OPTS,
         defaults=defaults,
+        split_defaults=split_defaults,
         st_type='allPvP',
         notice=notice
     )
@@ -352,12 +363,14 @@ def pvp(text, nick, bot, notice):
 def pve(text, nick, bot, notice):
     defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
         'bestWeapon', 'secondsPlayed']
+    split_defaults = ['k/d']
     return compile_stats(
         text=text,
         nick=nick,
         bot=bot,
         opts=PVE_OPTS,
         defaults=defaults,
+        split_defaults=split_defaults,
         st_type='allPvE',
         notice=notice
     )
