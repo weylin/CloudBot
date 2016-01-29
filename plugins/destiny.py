@@ -229,6 +229,9 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
 
     target = compile_stats_arg_parse(text, nick)
 
+    if target['user'] is None or not target['nick']:
+        return "No possible user found."
+
     membership = target['user']
 
     # if no stats are specified, add some
@@ -337,7 +340,10 @@ def compile_stats_arg_parse(text_arr, given_nick):
     # If we didn't get a nick, assume the requester.
     if not nick:
         user = get_user(given_nick, CONSOLE2ID[console]) if console else get_user(given_nick)
-        nick = given_nick
+        if not isinstance(user, str):
+           nick = given_nick
+        else:
+           user = None
 
     return_dict = {'user': user, 'nick': nick, 'console': console, 'stats': collect, 'split': split}
     return return_dict
