@@ -60,7 +60,7 @@ def hit_or_miss(deploy, shoot):
 
 def set_event_time():
     global GAME
-    GAME['event_time'] = random.randint(int(time()) + 900, int(time()) + 3600)
+    GAME['event_time'] = random.randint(int(time()) + 1800, int(time()) + 3600)
     GAME['event_status'] = False
     return
 
