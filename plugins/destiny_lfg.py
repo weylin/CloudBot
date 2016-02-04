@@ -1,8 +1,9 @@
 from cloudbot import hook
+from ..plugins.destiny import chars
 from pickle import dump, load
 
 SESSIONS = {}
-MEMBERS = {}
+MEMBERS = []
 SHERPAS = {'xb1': [], 'xb360': [], 'ps4': [], 'ps3': []}
 CONSOLES = ['\x02\x033Xbox One\x02\x03', '\x02\x0312Playstation 4\x02\x03',
             '\x02\x033Xbox 360\x02\x03', '\x02\x0312Playstation 3\x02\x03']
@@ -36,10 +37,10 @@ def session_info(session):
         member_count = '{}/{}'.format(len(session['members']), int(session['limit']))
 
     return ('Id: {}, Owner: {}, Title: {}, Time: {}, Date: {},'
-            'Console: {}, Members: {}, Limit: {}'.format(
+            ' Console: {}, Members: {}, Limit: {}'.format(
                 session['id'], session['owner'], session['title'],
                 session['time'], session['date'],
-                console, ', '.format(session['members']), member_count
+                console, ', '.join(session['members']), member_count
             ))
 
 
@@ -55,7 +56,7 @@ def load_data(bot):
             SESSION_COUNT = load(f)
     except:
         SESSIONS = {}
-        MEMBERS = {}
+        MEMBERS = []
         SHERPAS = {'xb1': [], 'xb360': [], 'ps4': [], 'ps3': []}
         SESSION_COUNT = 0
 
@@ -89,7 +90,7 @@ def lfg(text, nick, bot, notice):
 def lfm(text, nick, bot, notice):
     # Returns available players. Can filter by console
     for member in MEMBERS:
-        notice(member)
+        notice(chars(member, nick, bot, notice))
 
 
 @hook.command('sherpas')
@@ -193,7 +194,7 @@ def list_sessions(text, nick, bot, notice):
             notice(session_info(session))
     else:
         for session in SESSIONS:
-            notice(session_info(session))
+            notice(session_info(SESSIONS[session]))
 
 
 @hook.command('joinSession')
@@ -202,10 +203,9 @@ def join_session(text, nick, bot, notice):
     session = SESSIONS.get(text, None)
     if not session:
         notice('Could not find session with id of {}'.format(text))
-        return
-    if nick in session['members']:
+    elif nick in session['members']:
         notice('You can\'t join a session twice!')
-    if len(session['members']) < int(session['limit']):
+    elif len(session['members']) < int(session['limit']):
         session['members'].append(nick)
         notice('Successfully joined session {}.'.format(text))
 
@@ -223,7 +223,7 @@ def leave_session(text, nick, bot, notice):
 
 
 @hook.command('listme')
-def listme(text, nick, bot, notice):
+def listme(nick, bot, notice):
     # Add a member to the list of those available
     if nick in MEMBERS:
         notice('You are already listed.')
