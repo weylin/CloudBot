@@ -271,10 +271,6 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
         output.append('{}: {}'.format(CONSOLES[console - 1], ', '.join(tmp_out)))
     return '\x02{0}\x02: {1}'.format(target['nick'], '; '.join(output))
 
-# Sample input:
-# ['k/d', 'split']
-# ['tuzonghua', 'xbox']
-# ['tuzonghua']
 def compile_stats_arg_parse(text_arr, given_nick):
     '''Parse the input
 
@@ -309,7 +305,7 @@ def compile_stats_arg_parse(text_arr, given_nick):
                 for i, arg in enumerate(collect):
                     user = get_user(arg, CONSOLE2ID[console])
                     if not isinstance(user, str):
-                        # Gamertag given, found, remove it. 
+                        # Gamertag given, found, remove it.
                         collect.pop(i)
                         nick = arg
                         break
@@ -566,9 +562,13 @@ def lore(text, bot, notice):
 def collection(text, nick, bot):
     text = nick if not text else text
     membership = get_user(text)
+    links = CACHE['links'].get(nick)
+
     if type(membership) == str:
         return membership
+
     output = []
+
     for console in membership:
         grimoire = get(
             '{}Vanguard/Grimoire/{}/{}/'
@@ -588,11 +588,25 @@ def collection(text, nick, bot):
                 ghosts = card['statisticCollection'][0]['displayValue']
                 if int(ghosts) >= 99:
                     ghosts = 99
-        output.append('{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}'.format(
-            CONSOLES[console - 1], grimoire['score'], CACHE['collections']['grim_tally'],
-            ghosts, CACHE['collections']['ghost_tally'],
-            len(found_frags), len(CACHE['collections']['fragments']))
-        )
+
+        if console == 1:
+            platform = "xbl"
+        else:
+            platform = "psn"
+
+        output.append('{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{} - {}'.format(
+            CONSOLES[console - 1],
+            grimoire['score'],
+            CACHE['collections']['grim_tally'],
+            ghosts,
+            CACHE['collections']['ghost_tally'],
+            len(found_frags),
+            len(CACHE['collections']['fragments']),
+            try_shorten('http://destinystatus.com/{}/{}'.format(
+                platform,
+                links[console]
+            ))
+        ))
     return output
 
 @hook.command('link')
