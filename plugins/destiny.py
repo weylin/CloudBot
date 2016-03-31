@@ -602,7 +602,7 @@ def collection(text, nick, bot):
             CACHE['collections']['ghost_tally'],
             len(found_frags),
             len(CACHE['collections']['fragments']),
-            try_shorten('http://destinystatus.com/{}/{}'.format(
+            try_shorten('http://destinystatus.com/{}/{}/grimoire'.format(
                 platform,
                 links[console]
             ))
