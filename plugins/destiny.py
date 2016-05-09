@@ -15,6 +15,8 @@ CLASS_HASH = {671679327: 'Hunter', 3655393761: 'Titan', 2271682572: 'Warlock'}
 RACE_HASH = {898834093: 'Exo', 3887404748: 'Human', 2803282938: 'Awoken'}
 CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0312Playstation\x02\x03']
 STAT_HASHES = {144602215: 'Int', 1735777505: 'Disc', 4244567218: 'Str'}
+ENEMY_RACE_HASH = {3265589059: 'Hive', 546070638: 'Cabal', 711470098: 'Vex', 1636291695: 'Fallen'}
+BOSS_COMBATANT_HASH = {1: 'Pilot Servitor', 2: 'Val Aru\'un', 3: 'Wretched Knight', 4: 'Overmind Minotaur', 5: 'Seditious Mind', 6: 'Noru’usk, Servant of Oryx', 7: 'Keksis the Betrayed', 8: 'Sylok, the Defiled'}
 LORE_CACHE = {}
 HEADERS = {}
 WEAPON_TYPES = ['Super', 'Melee', 'Grenade', 'AutoRifle', 'FusionRifle',
@@ -444,6 +446,30 @@ def nightfall(text, bot):
             CACHE['last_nightfall'] = CACHE['nightfall']
         CACHE['nightfall'] = output
         return output
+
+@hook.command('coe')
+def coe(text,bot):
+    if CACHE.get('coe', None) and text.lower() not in ['flush', 'clear', 'purge']:
+        if 'last' in text.lower():
+            return CACHE.get('last_coe', 'Unavailable')
+        else:
+            return CACHE['coe']
+    else:
+        advisors = get('{}advisors/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+        for activity in advisors['activities']:
+            if activity['display']['advisorTypeCategory'] == 'Challenge of the Elders':
+                modifiers = []
+                for skullCategory in activity['extended']['skullCategories']:
+                    for skull in skullCategory['skulls']:
+                        modifiers.append(skull['displayName'])
+                output = '\x02Challenge of the Elders\x02 - \x02Rounds:\x02 {} || \x02Modifiers:\x02 {}'.format(
+                    ' // '.join(BOSS_COMBATANT_HASH[round['bossCombatantHash']] for round in activity['activityTiers'][0]['extended']['rounds']),
+                    ' // '.join(modifiers)
+                    )
+                if 'coe' in CACHE and output != CACHE['coe']:
+                    CACHE['last_coe'] = CACHE['coe']
+                CACHE['coe'] = output
+                return output
 
 @hook.command('xur')
 def xur(text, bot):
