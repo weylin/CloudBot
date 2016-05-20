@@ -531,6 +531,55 @@ def xur(text, bot):
     CACHE['xur'] = output
     return output
 
+@hook.command('armsday')
+def armsday(text, bot):
+    if 'last' in text.lower():
+        return CACHE.get('last_armsday', 'Unavailable')
+
+    # reset happens at 9am UTC, so subtract that to simplify the math
+    now = datetime.datetime.utcnow() - datetime.timedelta(hours=9)
+    if now.weekday() in [0,1,6]:
+
+        armsday_diff = 2 - now.weekday()
+        if armsday_diff < -1: # if past saturday, bump to next week
+            armsday_diff += 7
+
+        armsday = (now + datetime.timedelta(days=armsday_diff)).replace(hour=0, minute=0, second=0, microsecond=0)
+        time_to_armsday = armsday - now
+
+        s = time_to_armsday.seconds
+        h, s = divmod(s, 3600)
+        m, s = divmod(s, 60)
+
+        output = []
+
+        if time_to_armsday.days > 0:
+            output.append('{} days'.format(time_to_armsday.days))
+
+        if h: output.append('{} hours'.format(h))
+        if m: output.append('{} minutes'.format(m))
+        if s: output.append('{} seconds'.format(s))
+
+        return '\x02Armsday will return in\x02 {}'.format(', '.join(output))
+
+    if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
+        return CACHE['armsday']
+    
+    advisors = get('{}advisors/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+    for activity in advisors['activities']:
+        if activity['display']['advisorTypeCategory'] == 'Arms Day':
+            armsday_orders = []
+            for order in activity['extended']['orders']:
+                armsday_orders.append(order['item']['itemHash'])
+            for order in armsday_orders:
+                armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
+            output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
+
+    if output != CACHE.get('armsday', output):
+        CACHE['last_armsday'] = CACHE['armsday']
+    CACHE['armsday'] = output
+    return output
+
 
 @hook.command('lore')
 def lore(text, bot, notice):
