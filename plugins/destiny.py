@@ -457,19 +457,20 @@ def coe(text,bot):
     else:
         advisors = get('{}advisors/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
         for activity in advisors['activities']:
-            if activity['display']['advisorTypeCategory'] == 'Challenge of the Elders':
-                modifiers = []
-                for skullCategory in activity['extended']['skullCategories']:
-                    for skull in skullCategory['skulls']:
-                        modifiers.append(skull['displayName'])
-                output = '\x02Challenge of the Elders\x02 - \x02Rounds:\x02 {} || \x02Modifiers:\x02 {}'.format(
-                    ' // '.join(BOSS_COMBATANT_HASH[round['bossCombatantHash']] for round in activity['activityTiers'][0]['extended']['rounds']),
-                    ' // '.join(modifiers)
-                    )
-                if 'coe' in CACHE and output != CACHE['coe']:
-                    CACHE['last_coe'] = CACHE['coe']
-                CACHE['coe'] = output
-                return output
+            if activity != None:
+                if activity['display']['advisorTypeCategory'] == 'Challenge of the Elders':
+                    modifiers = []
+                    for skullCategory in activity['extended']['skullCategories']:
+                        for skull in skullCategory['skulls']:
+                            modifiers.append(skull['displayName'])
+                    output = '\x02Challenge of the Elders\x02 - \x02Rounds:\x02 {} || \x02Modifiers:\x02 {}'.format(
+                        ' // '.join(BOSS_COMBATANT_HASH[round['bossCombatantHash']] for round in activity['activityTiers'][0]['extended']['rounds']),
+                        ' // '.join(modifiers)
+                        )
+                    if 'coe' in CACHE and output != CACHE['coe']:
+                        CACHE['last_coe'] = CACHE['coe']
+                    CACHE['coe'] = output
+                    return output
 
 @hook.command('xur')
 def xur(text, bot):
