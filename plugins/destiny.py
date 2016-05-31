@@ -563,16 +563,13 @@ def armsday(text, bot):
     if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
         return CACHE['armsday']
     
-    advisors = get('{}advisors/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
-    for activity in advisors['activities']:
-        if activity != None:
-            if activity['display']['advisorTypeCategory'] == 'Arms Day':
-                armsday_orders = []
-                for order in activity['extended']['orders']:
-                    armsday_orders.append(order['item']['itemHash'])
-                for order in armsday_orders:
-                    armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
-                output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
+    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['armsday']
+    armsday_orders = []
+    for order in advisor['extended']['orders']:
+        armsday_orders.append(order['item']['itemHash'])
+    for order in armsday_orders:
+        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
+    output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
 
     if output != CACHE.get('armsday', output):
         CACHE['last_armsday'] = CACHE['armsday']
