@@ -455,13 +455,13 @@ def coe(text,bot):
         else:
             return CACHE['coe']
     else:
-        advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+        advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['elderchallenge']
         modifiers = []
-        for skullCategory in advisors['activities']['elderchallenge']['extended']['skullCategories']:
+        for skullCategory in advisor['extended']['skullCategories']:
             for skull in skullCategory['skulls']:
                 modifiers.append(skull['displayName'])
         output = '\x02Challenge of the Elders\x02 - \x02Rounds:\x02 {} || \x02Modifiers:\x02 {}'.format(
-            ' // '.join(BOSS_COMBATANT_HASH[round['bossCombatantHash']] for round in advisors['activities']['elderchallenge']['activityTiers'][0]['extended']['rounds']),
+            ' // '.join(BOSS_COMBATANT_HASH[round['bossCombatantHash']] for round in advisor['activityTiers'][0]['extended']['rounds']),
             ' // '.join(modifiers)
             )
         if 'coe' in CACHE and output != CACHE['coe']:
