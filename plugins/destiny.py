@@ -419,6 +419,48 @@ def item_search(text, bot):
         ))
     return output[:3]
 
+@hook.command('daily')
+def daily(text,bot):
+    CACHE['daily'] = {'output': '\x02Daily activities:\x02 Salvage || Enemy of My Enemy: Assault the Cabal ship crashed on the Dreadnaught. Learn what they know about Oryx and his defenses.', 'expiration': '2016-06-09T09:00:00Z'}
+
+    if 'last' in text.lower(): 
+        try: 
+            return CACHE['last_daily']['output'] 
+        except KeyError:
+            return 'Unavailable.'
+
+    if 'daily' in CACHE and datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['daily']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
+        return CACHE['daily']['output']
+
+    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+    dailycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
+    dailychapter = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailychapter']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
+    new_daily = { 'expiration': advisors['activities']['dailycrucible']['status']['expirationDate'], 'output': '\x02Daily activities:\x02 {} || {}: {}'.format(dailycrucible['activityName'],dailychapter['activityName'],dailychapter['activityDescription']) }
+    
+    if 'daily' in CACHE and new_daily != CACHE['daily']:
+        CACHE['last_daily'] = CACHE['daily']
+    CACHE['daily'] = new_daily
+    return new_daily['output']
+
+@hook.command('weekly')
+def weekly(text,bot):
+    if 'last' in text.lower(): 
+        try: 
+            return CACHE['last_weekly']['output'] 
+        except KeyError:
+            return 'Unavailable.'
+
+    if 'weekly' in CACHE and datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['weekly']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
+        return CACHE['weekly']['output']
+
+    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+    weeklycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
+    new_weekly = { 'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 'output': '\x02Weekly activities:\x02 {} || {}'.format(weeklycrucible['activityName'],advisors['activities']['kingsfall']['activityTiers'][0]['skullCategories'][0]['skulls'][0]['displayName']) }
+    
+    if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
+        CACHE['last_weekly'] = CACHE['weekly']
+    CACHE['weekly'] = new_weekly
+    return new_weekly['output']
 
 @hook.command('nightfall')
 def nightfall(text, bot):
