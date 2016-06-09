@@ -421,8 +421,6 @@ def item_search(text, bot):
 
 @hook.command('daily')
 def daily(text,bot):
-    CACHE['daily'] = {'output': '\x02Daily activities:\x02 Salvage || Enemy of My Enemy: Assault the Cabal ship crashed on the Dreadnaught. Learn what they know about Oryx and his defenses.', 'expiration': '2016-06-09T09:00:00Z'}
-
     if 'last' in text.lower(): 
         try: 
             return CACHE['last_daily']['output'] 
