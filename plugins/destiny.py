@@ -419,6 +419,41 @@ def item_search(text, bot):
         ))
     return output[:3]
 
+@hook.command('trials')
+def trials(text,bot):
+    if 'flush' in text.lower(): CACHE['trials'] = {}
+    if 'last' in text.lower(): 
+        try: 
+            return CACHE['last_trials']['output'] 
+        except KeyError:
+            return 'Unavailable.'    
+    if 'trials' in CACHE:
+        if 'expiration' in CACHE['trials']:
+            if datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['trials']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
+                return CACHE['trials']['output']
+        if 'nextStart' in CACHE['trials']:
+            if datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['trials']['nextStart'],'%Y-%m-%dT%H:%M:%SZ'):
+                time_to_trials = datetime.datetime.strptime(CACHE['trials']['nextStart'], '%Y-%m-%dT%H:%M:%SZ') - datetime.datetime.utcnow()
+                s = time_to_trials.seconds
+                h, s = divmod(s, 3600)
+                m, s = divmod(s, 60)
+                output = []
+                if time_to_trials.days > 0:
+                    output.append('{} days'.format(time_to_trials.days))
+                if h: output.append('{} hours'.format(h))
+                if m: output.append('{} minutes'.format(m))
+                if s: output.append('{} seconds'.format(s))
+                return '\x02Trials of Osiris will return in\x02 {}'.format(', '.join(output))
+
+    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['trials']
+    trials_map = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']['activityName']
+    new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime.datetime.strftime(datetime.datetime.strptime(advisors['status']['startDate'],'%Y-%m-%dT%H:%M:%SZ') + datetime.timedelta(days=7),'%Y-%m-%dT%H:%M:%SZ'), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
+    
+    if 'trials' in CACHE and new_trials != CACHE['trials']:
+        CACHE['last_trials'] = CACHE['trials']
+    CACHE['trials'] = new_trials
+    return new_trials['output']
+
 @hook.command('daily')
 def daily(text,bot):
     if 'last' in text.lower(): 
