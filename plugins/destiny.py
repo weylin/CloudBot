@@ -446,6 +446,10 @@ def trials(text,bot):
                 return '\x02Trials of Osiris will return in\x02 {}'.format(', '.join(output))
 
     advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['trials']
+    if advisors['status']['active'] == False:
+        CACHE['trials'] = { 'expiration': datetime.datetime.strftime(datetime.datetime.strptime(advisors['status']['startDate'],'%Y-%m-%dT%H:%M:%SZ') - datetime.timedelta(days=14),'%Y-%m-%dT%H:%M:%SZ'), 'nextStart': advisors['status']['startDate'], 'output': '\x02Trials of Osiris:\x02 Unavailable.'  }
+        return trials('','')
+
     trials_map = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']['activityName']
     new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime.datetime.strftime(datetime.datetime.strptime(advisors['status']['startDate'],'%Y-%m-%dT%H:%M:%SZ') + datetime.timedelta(days=7),'%Y-%m-%dT%H:%M:%SZ'), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
     
