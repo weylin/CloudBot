@@ -441,11 +441,11 @@ def trials(text,bot):
             return 'Unavailable.'    
     if 'trials' in CACHE:
         if 'expiration' in CACHE['trials']:
-            if datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['trials']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
+            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['expiration']):
                 return CACHE['trials']['output']
         if 'nextStart' in CACHE['trials']:
-            if datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['trials']['nextStart'],'%Y-%m-%dT%H:%M:%SZ'):
-                time_to_trials = datetime.datetime.strptime(CACHE['trials']['nextStart'], '%Y-%m-%dT%H:%M:%SZ') - datetime.datetime.utcnow()
+            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['nextStart']):
+                time_to_trials = string_to_datetime(CACHE['trials']['nextStart']) - datetime.datetime.utcnow()
                 s = time_to_trials.seconds
                 h, s = divmod(s, 3600)
                 m, s = divmod(s, 60)
@@ -459,11 +459,11 @@ def trials(text,bot):
 
     advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['trials']
     if advisors['status']['active'] == False:
-        CACHE['trials'] = { 'expiration': datetime.datetime.strftime(datetime.datetime.strptime(advisors['status']['startDate'],'%Y-%m-%dT%H:%M:%SZ') - datetime.timedelta(days=14),'%Y-%m-%dT%H:%M:%SZ'), 'nextStart': advisors['status']['startDate'], 'output': '\x02Trials of Osiris:\x02 Unavailable.'  }
+        CACHE['trials'] = { 'expiration': datetime_to_string(string_to_datetime(advisors['status']['startDate']) - datetime.timedelta(days=14)), 'nextStart': advisors['status']['startDate'], 'output': '\x02Trials of Osiris:\x02 Unavailable.'  }
         return trials('','')
 
     trials_map = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']['activityName']
-    new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime.datetime.strftime(datetime.datetime.strptime(advisors['status']['startDate'],'%Y-%m-%dT%H:%M:%SZ') + datetime.timedelta(days=7),'%Y-%m-%dT%H:%M:%SZ'), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
+    new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime_to_string(string_to_datetime(advisors['status']['startDate']) + datetime.timedelta(days=7)), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
     
     if 'trials' in CACHE and new_trials != CACHE['trials']:
         CACHE['last_trials'] = CACHE['trials']
