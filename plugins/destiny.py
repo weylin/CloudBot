@@ -53,6 +53,18 @@ def strip_tags(html):
     s.feed(html)
     return s.get_data().replace('\n', '\t')
 
+def string_to_datetime(datetime_as_string):
+    try:
+        return datetime.datetime.strptime(datetime_as_string,'%Y-%m-%dT%H:%M:%SZ')
+    except ValueError:
+        try: 
+            return datetime.datetime.strptime(datetime_as_string,'%Y-%m-%dT%H:%M:%S.%fZ')
+        except:
+            return 'ValueError'
+
+def datetime_to_string(datetime_object):
+    return datetime.datetime.strftime(datetime_object,'%Y-%m-%dT%H:%M:%SZ')
+
 def get_user(user_name, console=None):
     '''
     Takes in a username and returns a dictionary of all systems they are
