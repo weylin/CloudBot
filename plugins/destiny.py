@@ -105,7 +105,7 @@ def get_user(user_name, console=None):
             }
             user_info[platform] = user_dict
 
-        CACHE[user_name] = user_info
+        # CACHE[user_name] = user_info
         return user_info if user_info else 'A user by the name {} was not found.'.format(user_name)
 
 def prepare_lore_cache():
@@ -906,6 +906,32 @@ def chars(text, nick, bot, notice):
             ' || '.join(console_output)
         ))
     return "\x02{0}\x02: {1}".format(target['nick'], ' ; '.join(output))
+
+@hook.command('triumphs')
+def triumphs(text,nick,bot):
+    Y2_MOT_HASH = { '1872531696':'Challenge of the Elders','1872531697':'The Play\'s the Thing','1872531698':'The Third Element','1872531699':'This is Amazing','1872531700':'Eris Morn\'s Revenge','1872531701':'A Blade Reborn','1872531702':'Return to the Reef','1872531703': 'The Sword Logic'}
+    output = []
+    if text:
+        platform = text.split(' ').pop()
+        if platform not in ['psn','ps','playstation','ps4','xb1','xb','xbl','xbox']:
+            return 'When using gamertag you must also supply platform'
+        if platform in ['psn','ps','playstation','ps4']: platform = 2
+        if platform in ['xb1','xb','xbl','xbox']: platform = 1
+        membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),platform)
+    else:
+        membership = get_user(nick)
+    if type(membership) == str: return membership
+    for platform in [1,2]:
+        if platform in membership:
+            missing = []
+            output.append(CONSOLES[platform - 1] + ':')
+            book = get('{}{}/Account/{}/Advisors/?definitions=true'.format(BASE_URL,platform,membership[platform]['membershipId']),headers=HEADERS).json()['Response']['data']['recordBooks']['2175864601']
+            for hash in Y2_MOT_HASH:
+                if book['records'][hash]['objectives'][0]['isComplete'] == False:
+                    missing.append(Y2_MOT_HASH[hash])
+            if not missing: missing = ['Moments of triumph complete!']
+            output.append(', '.join(missing))
+    return ' '.join(output)
 
 @hook.command('rules')
 def rules(bot):
