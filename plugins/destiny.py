@@ -202,6 +202,10 @@ def get_stat(data, stat):
     else:
         return 'Invalid option {}'.format(stat)
 
+def coo_t3(when):
+    bosses = ['Thalnok, Fanatic of Crota','Balwûr','Kagoor']
+    return bosses[ ((when - datetime.date(2015,9,15)).days // 7) % 3 ]
+
 @hook.on_start()
 def load_cache(bot):
     '''Load in our pickle cache and the Headers'''
@@ -504,7 +508,13 @@ def weekly(text,bot):
 
     advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
     weeklycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
-    new_weekly = { 'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 'output': '\x02Weekly activities:\x02 {} || {}'.format(weeklycrucible['activityName'],advisors['activities']['kingsfall']['activityTiers'][0]['skullCategories'][0]['skulls'][0]['displayName']) }
+    new_weekly = { 
+            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
+            'output': '\x02Weekly activities:\x02 {} || {} || {}'.format(
+                            weeklycrucible['activityName'],
+                            advisors['activities']['kingsfall']['activityTiers'][0]['skullCategories'][0]['skulls'][0]['displayName'],
+                            coo_t3(datetime.date.today())) 
+            }
     
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
         CACHE['last_weekly'] = CACHE['weekly']
@@ -932,6 +942,10 @@ def triumphs(text,nick,bot):
             if not missing: missing = ['Moments of triumph complete!']
             output.append(', '.join(missing))
     return ' '.join(output)
+
+@hook.command('coo')
+def coo(bot):
+    return 'Court of Oryx Tier 3 Boss: ' + coo_t3(datetime.date.today()) 
 
 @hook.command('rules')
 def rules(bot):
