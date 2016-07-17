@@ -962,19 +962,17 @@ def news(text):
         item_number = 0
     else:
         rss, item_number = text.split()
-        item_number = int(item_number)
+        item_number = item_number
 
-    if item_number > 100:
+    if int(item_number) > 100:
         return "I'll only check the last \x02100\x02 posts."
 
-    for item, key in feeds.items():
-        if rss == item:
-            ask = key
+    if rss in feeds: ask = feeds[rss]
 
     if item_number == 0: 
         url = ('https://www.bungie.net/en/rss/News?currentpage=1&itemsPerPage=1')
     else:
-        url = (feed_base_url + rss + feed_curr + str(item_number) + feed_items_per)
+        url = (feed_base_url + ask + feed_curr + item_number + feed_items_per)
 
     feed = parse(url)
 
