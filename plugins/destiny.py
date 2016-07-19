@@ -497,23 +497,34 @@ def daily(text,bot):
 
 @hook.command('weekly')
 def weekly(text,bot):
+    if 'flush' in text.lower(): CACHE['weekly'] = {}
     if 'last' in text.lower(): 
         try: 
             return CACHE['last_weekly']['output'] 
         except KeyError:
             return 'Unavailable.'
-
-    if 'weekly' in CACHE and datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['weekly']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
+    if (
+        'weekly' in CACHE and 
+        CACHE['weekly'] != {} and 
+        datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['weekly']['expiration'],'%Y-%m-%dT%H:%M:%SZ')
+        ):
         return CACHE['weekly']['output']
 
     advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
-    weeklycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
+
+    weeklycrucible = get('{}Manifest/1/{}/'.format(
+        BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),
+        headers=HEADERS).json()['Response']['data']['activity']['activityName']
+
+    for activity in advisors['activities']['kingsfall']['activityTiers']:
+        for skullCategory in activity['skullCategories']:
+            for skull in skullCategory['skulls']:
+                if 'description' in skull and skull['description'] == 'You have been challenged...':
+                    kingsfallChallenge = skull['displayName']
+
     new_weekly = { 
             'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
-            'output': '\x02Weekly activities:\x02 {} || {} || {}'.format(
-                            weeklycrucible['activityName'],
-                            advisors['activities']['kingsfall']['activityTiers'][0]['skullCategories'][0]['skulls'][0]['displayName'],
-                            coo_t3(datetime.date.today())) 
+            'output': '\x02Weekly activities:\x02 {} || {} || {}'.format(weeklycrucible,kingsfallChallenge,coo_t3(datetime.date.today())) 
             }
     
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
