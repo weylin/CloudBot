@@ -265,11 +265,14 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
             continue
 
         # Get stats
-        data = get(
-            '{}Stats/Account/{}/{}/'.format(
-                BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response'][path]
+        try:
+            data = get(
+                '{}Stats/Account/{}/{}/'.format(
+                    BASE_URL, console, membership[console]['membershipId']),
+                headers=HEADERS
+            ).json()['Response'][path]
+        except KeyError:
+            return 'Shit\'s broke'
         tmp_out = []
         if not split:
             try:
