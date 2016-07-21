@@ -933,10 +933,19 @@ def chars(text, nick, bot, notice):
 
 @hook.command('triumphs')
 def triumphs(text,nick,bot):
-    Y2_MOT_HASH = { '1872531696':'Challenge of the Elders','1872531697':'The Play\'s the Thing','1872531698':'The Third Element','1872531699':'This is Amazing','1872531700':'Eris Morn\'s Revenge','1872531701':'A Blade Reborn','1872531702':'Return to the Reef','1872531703': 'The Sword Logic'}
+    Y2_MOT_HASH = { 
+        '1872531696':'Challenge of the Elders',
+        '1872531697':'The Play\'s the Thing',
+        '1872531698':'The Third Element',
+        '1872531699':'This is Amazing',
+        '1872531700':'Eris Morn\'s Revenge',
+        '1872531701':'A Blade Reborn',
+        '1872531702':'Return to the Reef',
+        '1872531703': 'The Sword Logic'
+        }
     output = []
     if text:
-        platform = text.split(' ').pop()
+        platform = text.split(' ').pop().lower()
         if platform not in ['psn','ps','playstation','ps4','xb1','xb','xbl','xbox']:
             return 'When using gamertag you must also supply platform'
         if platform in ['psn','ps','playstation','ps4']: platform = 2
@@ -949,11 +958,13 @@ def triumphs(text,nick,bot):
         if platform in membership:
             missing = []
             output.append(CONSOLES[platform - 1] + ':')
-            book = get('{}{}/Account/{}/Advisors/?definitions=true'.format(BASE_URL,platform,membership[platform]['membershipId']),headers=HEADERS).json()['Response']['data']['recordBooks']['2175864601']
+            book = get('{}{}/Account/{}/Advisors/?definitions=true'.format(
+                BASE_URL,platform,membership[platform]['membershipId']),
+                headers=HEADERS).json()['Response']['data']['recordBooks']['2175864601']
             for hash in Y2_MOT_HASH:
                 if book['records'][hash]['objectives'][0]['isComplete'] == False:
                     missing.append(Y2_MOT_HASH[hash])
-            if not missing: missing = ['Moments of triumph complete!']
+            if not missing: missing = ['Year Two Moments of Triumph complete!']
             output.append(', '.join(missing))
     return ' '.join(output)
 
