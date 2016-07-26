@@ -968,6 +968,44 @@ def triumphs(text,nick,bot):
             output.append(', '.join(missing))
     return ' '.join(output)
 
+@hook.command('news')
+def news(text):
+    feed_base_url = 'https://www.bungie.net/en/Rss/News?category='
+    feed_curr = '&currentpage='
+    feed_items_per = '&itemsPerPage=1'
+
+    feeds = {       #Current RSS Feeds breakouts.
+    'all'        : '',   #ALL
+    'news'       : 'news-destiny',
+    'bungie'     : 'news-bungie',
+    'community'  : 'news-community',
+    'updates'    : 'news-updates'
+    }
+
+    if text.find(' ') == -1:
+        rss = text
+        item_number = 0
+    else:
+        rss, item_number = text.split()
+        item_number = item_number
+
+    if int(item_number) > 100:
+        return "I'll only check the last \x02100\x02 posts."
+
+    if rss in feeds: ask = feeds[rss]
+
+    if item_number == 0: 
+        url = ('https://www.bungie.net/en/rss/News?currentpage=1&itemsPerPage=1')
+    else:
+        url = (feed_base_url + ask + feed_curr + item_number + feed_items_per)
+
+    feed = parse(url)
+
+    return '{} // {} // {}'.format(
+        feed['entries'][0]['title'],
+        feed['entries'][0]['description'],
+        feed['entries'][0]['link'])
+
 @hook.command('coo')
 def coo(bot):
     return 'Court of Oryx Tier 3 Boss: ' + coo_t3(datetime.date.today()) 
@@ -996,12 +1034,3 @@ def the100(bot):
 def clan(bot):
     return 'Check out our Clan: https://www.bungie.net/en/Clan/Detail/939927'
 
-@hook.command('news')
-def news(bot):
-    feed = parse('https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1')
-    if not feed.entries:
-        return 'Feed not found.'
-
-    return '{} - {}'.format(
-        feed['entries'][0]['summary'],
-        try_shorten(feed['entries'][0]['link']))
