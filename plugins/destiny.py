@@ -535,7 +535,7 @@ def weekly(text,bot):
     CACHE['weekly'] = new_weekly
     return new_weekly['output']
 
-@hook.command('nightfall')
+@hook.command('nightfall', 'nf')
 def nightfall(text, bot):
     if CACHE.get('nightfall', None) and not text.lower() == 'flush':
         if 'last' in text.lower():
