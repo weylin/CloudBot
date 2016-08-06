@@ -8,6 +8,8 @@ from sqlalchemy import Table, Column, String, PrimaryKeyConstraint
 from cloudbot import hook
 from cloudbot.util import timeformat, database
 from cloudbot.event import EventType
+from cloudbot.util import timeformat
+from cloudbot.event import EventType
 
 table = Table(
     'seen_user',
