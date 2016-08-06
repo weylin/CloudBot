@@ -1,12 +1,11 @@
-import asyncio
-import time
-
-import re
 from collections import deque
+import time
+import asyncio
+import re
 
 from cloudbot import hook
-from cloudbot.event import EventType
 from cloudbot.util import timeformat
+from cloudbot.event import EventType
 
 db_ready = []
 
@@ -93,47 +92,27 @@ def seen(text, nick, chan, db, event, conn):
     :type conn: cloudbot.client.Client
     """
 
-
-    nick_match = re.match("[A-Za-z0-9_|.\-\]\[]+", text.lower())
-    if nick_match:
-        name = nick_match.group(0)
-    else:
-        return "I can't look up that name, it's impossible to use!"
-
-    if event.conn.nick.lower() == name:
+    if event.conn.nick.lower() == text.lower():
         return "You need to get your eyes checked."
 
-    if text.lower() == name:
+    if text.lower() == nick.lower():
         return "Have you looked in a mirror lately?"
 
-    channel_match = re.search("#.+$", text.lower())
-    if channel_match:
-        chan_to_check = channel_match.group(0)
-    else:
-        chan_to_check = chan
+    if not re.match("^[A-Za-z0-9_|\^\*\`.\-\]\[\{\}\\\\]*$", text.lower()):
+        return "I can't look up that name, its impossible to use!"
 
     db_init(db, conn.name)
 
     last_seen = db.execute("select name, time, quote from seen_user where name like :name and chan = :chan",
-                           {'name': name, 'chan': chan_to_check}).fetchone()
+                           {'name': text, 'chan': chan}).fetchone()
 
     if last_seen:
         reltime = timeformat.time_since(last_seen[1])
-        if last_seen[0] != name.lower():  # for glob matching
-            name = last_seen[0]
-        if chan == chan_to_check:
-            if last_seen[2][0:1] == "\x01":
-                return '{} was last seen {} ago: * {} {}'.format(name, reltime, name, last_seen[2][8:-1])
-            else:
-                return '{} was last seen {} ago saying: {}'.format(name, reltime, last_seen[2])
+        if last_seen[0] != text.lower():  # for glob matching
+            text = last_seen[0]
+        if last_seen[2][0:1] == "\x01":
+            return '{} was last seen {} ago: * {} {}'.format(text, reltime, text, last_seen[2][8:-1])
         else:
-            if last_seen[2][0:1] == "\x01":
-                return 'In {}, {} was last seen {} ago: * {} {}'.format(chan_to_check, name, reltime, name,
-                                                                        last_seen[2][8:-1])
-            else:
-                return 'In {}, {} was last seen in {} ago saying: {}'.format(chan_to_check, name, reltime, last_seen[2])
+            return '{} was last seen {} ago saying: {}'.format(text, reltime, last_seen[2])
     else:
-        if chan == chan_to_check:
-            return "I've never seen {} talking in this channel.".format(name)
-        else:
-            return "I've never seen {} talking in {}.".format(name, chan)
+        return "I've never seen {} talking in this channel.".format(text)
