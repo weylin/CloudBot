@@ -2,7 +2,7 @@ import datetime
 import json
 from cloudbot import hook
 from html.parser import HTMLParser
-from random import sample
+from random import choice, sample
 from requests import get
 from pickle import dump, load
 from feedparser import parse
@@ -57,7 +57,7 @@ def string_to_datetime(datetime_as_string):
     try:
         return datetime.datetime.strptime(datetime_as_string,'%Y-%m-%dT%H:%M:%SZ')
     except ValueError:
-        try: 
+        try:
             return datetime.datetime.strptime(datetime_as_string,'%Y-%m-%dT%H:%M:%S.%fZ')
         except:
             return 'ValueError'
@@ -441,11 +441,11 @@ def item_search(text, bot):
 @hook.command('trials')
 def trials(text,bot):
     if 'flush' in text.lower(): CACHE['trials'] = {}
-    if 'last' in text.lower(): 
-        try: 
-            return CACHE['last_trials']['output'] 
+    if 'last' in text.lower():
+        try:
+            return CACHE['last_trials']['output']
         except KeyError:
-            return 'Unavailable.'    
+            return 'Unavailable.'
     if 'trials' in CACHE:
         if 'expiration' in CACHE['trials']:
             if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['expiration']):
@@ -471,7 +471,7 @@ def trials(text,bot):
 
     trials_map = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']['activityName']
     new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime_to_string(string_to_datetime(advisors['status']['startDate']) + datetime.timedelta(days=7)), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
-    
+
     if 'trials' in CACHE and new_trials != CACHE['trials']:
         CACHE['last_trials'] = CACHE['trials']
     CACHE['trials'] = new_trials
@@ -479,9 +479,9 @@ def trials(text,bot):
 
 @hook.command('daily')
 def daily(text,bot):
-    if 'last' in text.lower(): 
-        try: 
-            return CACHE['last_daily']['output'] 
+    if 'last' in text.lower():
+        try:
+            return CACHE['last_daily']['output']
         except KeyError:
             return 'Unavailable.'
 
@@ -492,7 +492,7 @@ def daily(text,bot):
     dailycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
     dailychapter = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailychapter']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
     new_daily = { 'expiration': advisors['activities']['dailycrucible']['status']['expirationDate'], 'output': '\x02Daily activities:\x02 {} || {}: {}'.format(dailycrucible['activityName'],dailychapter['activityName'],dailychapter['activityDescription']) }
-    
+
     if 'daily' in CACHE and new_daily != CACHE['daily']:
         CACHE['last_daily'] = CACHE['daily']
     CACHE['daily'] = new_daily
@@ -501,14 +501,14 @@ def daily(text,bot):
 @hook.command('weekly')
 def weekly(text,bot):
     if 'flush' in text.lower(): CACHE['weekly'] = {}
-    if 'last' in text.lower(): 
-        try: 
-            return CACHE['last_weekly']['output'] 
+    if 'last' in text.lower():
+        try:
+            return CACHE['last_weekly']['output']
         except KeyError:
             return 'Unavailable.'
     if (
-        'weekly' in CACHE and 
-        CACHE['weekly'] != {} and 
+        'weekly' in CACHE and
+        CACHE['weekly'] != {} and
         datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['weekly']['expiration'],'%Y-%m-%dT%H:%M:%SZ')
         ):
         return CACHE['weekly']['output']
@@ -525,11 +525,11 @@ def weekly(text,bot):
                 if 'description' in skull and skull['description'] == 'You have been challenged...':
                     kingsfallChallenge = skull['displayName']
 
-    new_weekly = { 
-            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
-            'output': '\x02Weekly activities:\x02 {} || {} || {}'.format(weeklycrucible,kingsfallChallenge,coo_t3(datetime.date.today())) 
+    new_weekly = {
+            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'],
+            'output': '\x02Weekly activities:\x02 {} || {} || {}'.format(weeklycrucible,kingsfallChallenge,coo_t3(datetime.date.today()))
             }
-    
+
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
         CACHE['last_weekly'] = CACHE['weekly']
     CACHE['weekly'] = new_weekly
@@ -677,7 +677,7 @@ def armsday(text, bot):
 
     if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
         return CACHE['armsday']
-    
+
     advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['armsday']
     armsday_orders = []
     for order in advisor['extended']['orders']:
@@ -933,7 +933,7 @@ def chars(text, nick, bot, notice):
 
 @hook.command('triumphs')
 def triumphs(text,nick,bot):
-    Y2_MOT_HASH = { 
+    Y2_MOT_HASH = {
         '1872531696':'Challenge of the Elders',
         '1872531697':'The Play\'s the Thing',
         '1872531698':'The Third Element',
@@ -970,7 +970,7 @@ def triumphs(text,nick,bot):
 
 @hook.command('coo')
 def coo(bot):
-    return 'Court of Oryx Tier 3 Boss: ' + coo_t3(datetime.date.today()) 
+    return 'Court of Oryx Tier 3 Boss: ' + coo_t3(datetime.date.today())
 
 @hook.command('rules')
 def rules(bot):
@@ -1005,3 +1005,13 @@ def news(bot):
     return '{} - {}'.format(
         feed['entries'][0]['summary'],
         try_shorten(feed['entries'][0]['link']))
+
+@hook.command('elo')
+def elo(bot):
+    lulz = [
+        'https://cdn.meme.am/instances/400x/54585027.jpg',
+        'http://blooperman.com/wp-content/uploads/2015/10/elo.jpg',
+        'http://blogs.discovermagazine.com/80beats/files/2011/07/Jello.jpg',
+        'https://media.giphy.com/media/3o7qEccSvsVHNT17Xi/giphy.gif'
+    ]
+    return try_shorten(choice(lulz))
