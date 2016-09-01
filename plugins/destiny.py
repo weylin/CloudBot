@@ -36,6 +36,14 @@ PVE_OPTS = ['activitiesEntered', 'activitiesCleared', 'avgKillDistance',
     'bestSingleGameKills', 'bestWeapon', 'longestKillSpree', 'deaths', 'kills', 'k/h',
     'secondsPlayed', 'longestSingleLife', 'orbsDropped', 'precisionKills',
     'precisionRate', 'suicides', 'winRate', 'publicEventsCompleted']
+ACTIVITY_MODE_TYPE = {
+    0:'None', 2:'Story', 3:'Strike', 4:'Raid', 5:'AllPvP', 6:'Patrol', 
+    7:'All PvE', 8:'PvP Introduction', 9:'3v3', 10:'Control', 11:'Lockdown',
+    12:'Clash', 13:'FFA', 14:'Trials',15:'Doubles', 16:'Nightfall',
+    17:'Heroic', 18:'All Strikes', 19:'Iron Banner', 20:'All Arena', 21:'Arena', 
+    22:'Arena Challenge', 23:'Elimination',24:'Rift', 25:'All Mayhem', 26: 'Mayhem Clash',
+    27:'Mayhem Rumble', 28:'Zone Control', 29:'SRL', 30:'Arena Elder Challenge'}
+
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -978,6 +986,48 @@ def triumphs(text,nick,bot):
             if not missing: missing = ['Year Two Moments of Triumph complete!']
             output.append(', '.join(missing))
     return ' '.join(output)
+
+@hook.command('lastpvp')
+def lastpvp(text,nick,bot):
+    if text:
+        platform = text.split(' ').pop().lower()
+        if platform not in ['psn','ps','playstation','ps4','xb1','xb','xbl','xbox']:
+            return 'When using gamertag you must also supply platform'
+        if platform in ['psn','ps','playstation','ps4']: platform = 2
+        if platform in ['xb1','xb','xbl','xbox']: platform = 1
+        membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),platform)
+    else:
+        membership = get_user(nick)
+    if type(membership) == str: return membership
+    
+    characters = []
+    for platform in [1,2]:
+        if platform in membership:
+            characters.append(
+                [
+                platform, 
+                membership[platform]['membershipId'], 
+                get('{}{}/Account/{}/Summary/'.format(
+                    BASE_URL, platform, membership[platform]['membershipId']),headers=HEADERS
+                    ).json()['Response']['data']['characters'][0]['characterBase']['characterId']])
+
+    output = []
+    for character in characters:
+        activity = get('{}Stats/ActivityHistory/{}/{}/{}/?mode=5'.format(BASE_URL, character[0], character[1], character[2]),headers=HEADERS).json()['Response']['data']['activities'][0]
+        output.append( '(' + CONSOLES[character[0]-1] + ')')
+        if activity['values']['standing']['basic']['displayValue'] == 'Victory':
+            output.append('\x02\x03\u2713' + ACTIVITY_MODE_TYPE[activity['activityDetails']['mode']] + '\x03\x03:')
+        else:
+            output.append('\x02\x04\u2715' + ACTIVITY_MODE_TYPE[activity['activityDetails']['mode']] + '\x02\x04:')
+        output.append(
+            ', '.join([
+                    'Score: ' + activity['values']['score']['basic']['displayValue'],
+                    'Kills: ' + activity['values']['kills']['basic']['displayValue'],
+                    'Deaths: ' + activity['values']['deaths']['basic']['displayValue'],
+                    '(' + activity['values']['killsDeathsRatio']['basic']['displayValue'] + ')']))
+        output.append( 'http://guardian.gg/en/pgcr/' + activity['activityDetails']['instanceId'])
+    return " ".join(output)
+
 
 @hook.command('coo')
 def coo(bot):
