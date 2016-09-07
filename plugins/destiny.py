@@ -982,14 +982,14 @@ def triumphs(text,nick,bot):
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
     if text:
-        platform = text.split(' ').pop().lower()
-        if platform not in ['psn','ps','playstation','ps4','xb1','xb','xbl','xbox']:
-            return 'When using gamertag you must also supply platform'
-        if platform in ['psn','ps','playstation','ps4']: platform = 2
-        if platform in ['xb1','xb','xbl','xbox']: platform = 1
-        membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),platform)
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: platform = 1; text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: platform = 2; text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
+        else: platform = 2
+        if text in CACHE: membership = get_user(text)
+        else: membership = get_user(text,platform)
     else:
         membership = get_user(nick)
+    return membership
     if type(membership) == str: return membership
     output = []
     for platform in [1,2]:
