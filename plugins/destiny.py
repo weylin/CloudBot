@@ -689,12 +689,14 @@ def armsday(text, bot):
     if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
         return CACHE['armsday']
 
-    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['armsday']
+    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),
+        headers=HEADERS).json()['Response']['data']['activities']['armsday']
     armsday_orders = []
     for order in advisor['extended']['orders']:
         armsday_orders.append(order['item']['itemHash'])
     for order in armsday_orders:
-        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
+        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(
+            BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
     output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
 
     if output != CACHE.get('armsday', output):
@@ -952,7 +954,7 @@ def triumphs(text,nick,bot):
         '1872531700':'Eris Morn\'s Revenge',
         '1872531701':'A Blade Reborn',
         '1872531702':'Return to the Reef',
-        '1872531703': 'The Sword Logic'
+        '1872531703':'The Sword Logic'
         }
     output = []
     if text:
@@ -982,8 +984,12 @@ def triumphs(text,nick,bot):
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
     if text:
-        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: platform = 1; text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
-        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: platform = 2; text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+            platform = 1 
+            text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+            platform = 2
+            text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
         else: platform = 2
         if text in CACHE: membership = get_user(text)
         else: membership = get_user(text,platform)
@@ -1008,12 +1014,16 @@ def lastpvp(text,nick,bot):
             if activity['values']['standing']['basic']['displayValue'] in ['Victory','1','2','3']:
                 output.append(
                     '\x02\x033\u2713 ' + 
-                    get('{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']),headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                    get('{}Manifest/2/{}/'.format(
+                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
                     '\x03\x02:')
             else:
                 output.append(
                     '\x02\x034\u2717 ' + 
-                    get('{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']),headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                    get('{}Manifest/2/{}/'.format(
+                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
                     '\x03\x02:')
             output.append(
                 ', '.join([
