@@ -995,7 +995,6 @@ def lastpvp(text,nick,bot):
         else: membership = get_user(text,platform)
     else:
         membership = get_user(nick)
-    return membership
     if type(membership) == str: return membership
     output = []
     for platform in [1,2]:
