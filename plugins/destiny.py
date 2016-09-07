@@ -985,14 +985,14 @@ def triumphs(text,nick,bot):
 def lastpvp(text,nick,bot):
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
-            platform = 1 
-            text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
         elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
-            platform = 2
-            text = ' '.join(text.split(' ')[0:len(text.split(' '))-1])
-        else: platform = 2
-        if text in CACHE: membership = get_user(text)
-        else: membership = get_user(text,platform)
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+        else: 
+            membership = get_user(text)
+            if type(membership) == str:
+                return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
+            else: membership = get_user(text)
     else:
         membership = get_user(nick)
     if type(membership) == str: return membership
