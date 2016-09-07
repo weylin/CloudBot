@@ -1005,7 +1005,7 @@ def lastpvp(text,nick,bot):
                 except:
                     pass
             output.append( '(' + CONSOLES[platform-1] + ')')
-            if activity['values']['standing']['basic']['displayValue'] == 'Victory':
+            if activity['values']['standing']['basic']['displayValue'] in ['Victory','1','2','3']:
                 output.append(
                     '\x02\x033\u2713 ' + 
                     get('{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']),headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
