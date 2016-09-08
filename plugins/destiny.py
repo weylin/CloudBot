@@ -80,8 +80,10 @@ def get_user(user_name, console=None):
             gamertag = platforms[platform]
             try:
                 # Get the Destiny membership ID
-                membershipId = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
-                    headers=HEADERS).json()['Response'][0]['membershipId']
+                searchResults = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
+                    headers=HEADERS).json()['Response'][0]
+                membershipId = searchResults['membershipId']
+                displayName = searchResults['displayName']
                 # Then get Destiny summary
                 characterHash = get(
                     '{}{}/Account/{}/Summary/'
@@ -100,6 +102,7 @@ def get_user(user_name, console=None):
                 }
             user_dict = {
                 'membershipId': membershipId,
+                'displayName': displayName,
                 'clan': characterHash.get('clanName', 'None'),
                 'characters': character_dict
             }
