@@ -762,12 +762,23 @@ def lore(text, bot, notice):
 
 @hook.command('collection')
 def collection(text, nick, bot):
-    text = nick if not text else text
-    membership = get_user(text)
-    links = CACHE['links'].get(nick)
+    if text:
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+            links = { 1: membership[1]['displayName']}
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+            links = { 2: membership[2]['displayName']}
+        else: 
+            membership = get_user(text)
+            if type(membership) == str:
+                return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
+            links = CACHE['links'].get(text)
+    else:
+        membership = get_user(nick)
+        links = CACHE['links'].get(nick)
 
-    if type(membership) == str:
-        return membership
+    if type(membership) == str: return membership
 
     output = []
 
