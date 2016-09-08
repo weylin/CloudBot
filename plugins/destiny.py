@@ -1006,11 +1006,13 @@ def lastpvp(text,nick,bot):
             membership = get_user(text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
-            else: membership = get_user(text)
     else:
         membership = get_user(nick)
+
     if type(membership) == str: return membership
+
     output = []
+
     for platform in [1,2]:
         if platform in membership:
             activity = {}
