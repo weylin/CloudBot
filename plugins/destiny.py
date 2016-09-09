@@ -80,8 +80,10 @@ def get_user(user_name, console=None):
             gamertag = platforms[platform]
             try:
                 # Get the Destiny membership ID
-                membershipId = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
-                    headers=HEADERS).json()['Response'][0]['membershipId']
+                searchResults = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
+                    headers=HEADERS).json()['Response'][0]
+                membershipId = searchResults['membershipId']
+                displayName = searchResults['displayName']
                 # Then get Destiny summary
                 characterHash = get(
                     '{}{}/Account/{}/Summary/'
@@ -100,6 +102,7 @@ def get_user(user_name, console=None):
                 }
             user_dict = {
                 'membershipId': membershipId,
+                'displayName': displayName,
                 'clan': characterHash.get('clanName', 'None'),
                 'characters': character_dict
             }
@@ -689,12 +692,14 @@ def armsday(text, bot):
     if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
         return CACHE['armsday']
 
-    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['armsday']
+    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),
+        headers=HEADERS).json()['Response']['data']['activities']['armsday']
     armsday_orders = []
     for order in advisor['extended']['orders']:
         armsday_orders.append(order['item']['itemHash'])
     for order in armsday_orders:
-        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
+        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(
+            BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
     output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
 
     if output != CACHE.get('armsday', output):
@@ -757,12 +762,23 @@ def lore(text, bot, notice):
 
 @hook.command('collection')
 def collection(text, nick, bot):
-    text = nick if not text else text
-    membership = get_user(text)
-    links = CACHE['links'].get(nick)
+    if text:
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+            links = { 1: membership[1]['displayName']}
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+            links = { 2: membership[2]['displayName']}
+        else: 
+            membership = get_user(text)
+            if type(membership) == str:
+                return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
+            links = CACHE['links'].get(text)
+    else:
+        membership = get_user(nick)
+        links = CACHE['links'].get(nick)
 
-    if type(membership) == str:
-        return membership
+    if type(membership) == str: return membership
 
     output = []
 
@@ -952,7 +968,7 @@ def triumphs(text,nick,bot):
         '1872531700':'Eris Morn\'s Revenge',
         '1872531701':'A Blade Reborn',
         '1872531702':'Return to the Reef',
-        '1872531703': 'The Sword Logic'
+        '1872531703':'The Sword Logic'
         }
     output = []
     if text:
@@ -982,16 +998,21 @@ def triumphs(text,nick,bot):
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
     if text:
-        platform = text.split(' ').pop().lower()
-        if platform not in ['psn','ps','playstation','ps4','xb1','xb','xbl','xbox']:
-            return 'When using gamertag you must also supply platform'
-        if platform in ['psn','ps','playstation','ps4']: platform = 2
-        if platform in ['xb1','xb','xbl','xbox']: platform = 1
-        membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),platform)
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+        else: 
+            membership = get_user(text)
+            if type(membership) == str:
+                return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
     else:
         membership = get_user(nick)
+
     if type(membership) == str: return membership
+
     output = []
+
     for platform in [1,2]:
         if platform in membership:
             activity = {}
@@ -1000,20 +1021,24 @@ def lastpvp(text,nick,bot):
                     x = get('{}Stats/ActivityHistory/{}/{}/{}/?mode=5'.format(
                         BASE_URL, platform, membership[platform]['membershipId'], character),
                         headers=HEADERS).json()['Response']['data']['activities'][0]
-                    if activity == {}: activity = x
-                    if 'period' in activity and x['period'] > activity['period']: activity = x
+                    if activity == {}: activity = x; char = character
+                    if 'period' in activity and x['period'] > activity['period']: activity = x; char = character
                 except:
                     pass
             output.append( '(' + CONSOLES[platform-1] + ')')
-            if activity['values']['standing']['basic']['displayValue'] == 'Victory':
+            if activity['values']['standing']['basic']['displayValue'] in ['Victory','1','2','3']:
                 output.append(
                     '\x02\x033\u2713 ' + 
-                    get('{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']),headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                    get('{}Manifest/2/{}/'.format(
+                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
                     '\x03\x02:')
             else:
                 output.append(
                     '\x02\x034\u2717 ' + 
-                    get('{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']),headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                    get('{}Manifest/2/{}/'.format(
+                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
                     '\x03\x02:')
             output.append(
                 ', '.join([
@@ -1022,6 +1047,33 @@ def lastpvp(text,nick,bot):
                         'Deaths: ' + activity['values']['deaths']['basic']['displayValue'],
                         '(' + activity['values']['killsDeathsRatio']['basic']['displayValue'] + ')']))
             output.append( 'http://guardian.gg/en/pgcr/' + activity['activityDetails']['instanceId'])
+            pgcr = get('{}/Stats/PostGameCarnageReport/{}/'.format(
+                BASE_URL,activity['activityDetails']['instanceId']),headers=HEADERS).json()['Response']['data']
+            for entry in pgcr['entries']:
+                if entry['characterId'] == char:
+                    
+                    if 'medalsActivityCompleteDeathless' in entry['extended']['values']: output.append('#MarkoftheUnbroken')
+                    if 'medalsActivityCompleteVictoryRumbleBlowout' in entry['extended']['values']: output.append('#SumofAllTears')
+                    if 'medalsActivityCompleteHighestScoreWinning' in entry['extended']['values']: output.append('#BestAround')
+                    if 'medalsActivityCompleteHighestScoreLosing' in entry['extended']['values']: output.append('#OntheBrightSide')
+                    if 'medalsActivityCompleteVictoryBlowout' in entry['extended']['values']: output.append('#DecisiveVictory')
+                    if 'medalsActivityCompleteVictoryMercy' in entry['extended']['values']: output.append('#NoMercy')
+                    if 'medalsActivityCompleteVictoryEliminationPerfect' in entry['extended']['values']: output.append('#Bulletproof')
+                    if 'medalsEliminationWipeSolo' in entry['extended']['values']: output.append('#WreckingBall')
+                    killSpree = ''
+                    if 'medalsKillSpree1' in entry['extended']['values']: killSpree = '#Merciless'
+                    if 'medalsKillSpree2' in entry['extended']['values']: killSpree = '#Relentless'
+                    if 'medalsKillSpree3' in entry['extended']['values']: killSpree = '#ReignOfTerror'
+                    if 'medalsKillSpreeAbsurd' in entry['extended']['values']: killSpree = '#WeRanOutOfMedals'
+                    if killSpree: output.append(killSpree)
+                    if 'medalsKillSpreeNoDamage' in entry['extended']['values']: output.append('#Phantom')
+                    killMulti = ''
+                    if 'medalsKillMulti3' in entry['extended']['values']: killMulti = '#TripleDown'
+                    if 'medalsKillMulti4' in entry['extended']['values']: killMulti = '#Breaker'
+                    if 'medalsKillMulti5' in entry['extended']['values']: killMulti = '#Slayer'
+                    if 'medalsKillMulti6' in entry['extended']['values']: killMulti = '#Reaper'
+                    if 'medalsKillMulti7' in entry['extended']['values']: killMulti = '#SeventhColumn'
+                    if killMulti: output.append(killMulti)
     return " ".join(output)
 
 @hook.command('coo')
