@@ -522,26 +522,21 @@ def weekly(text,bot):
         BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),
         headers=HEADERS).json()['Response']['data']['activity']['activityName']
 
+    kingsfallChallenge = []
     for activity in advisors['activities']['kingsfall']['activityTiers']:
         for skullCategory in activity['skullCategories']:
             for skull in skullCategory['skulls']:
                 if 'description' in skull and skull['description'] == 'You have been challenged...':
-                    kingsfallChallenge = skull['displayName']
+                    if skull['displayName'] not in kingsfallChallenge: kingsfallChallenge.append(skull['displayName'])
 
     heroicstrike = []
     for skullCategory in advisors['activities']['heroicstrike']['extended']['skullCategories']:
         for skull in skullCategory['skulls']:
             heroicstrike.append(skull['displayName'])
 
-    for activity in advisors['activities']['kingsfall']['activityTiers']:
-        for skullCategory in activity['skullCategories']:
-            for skull in skullCategory['skulls']:
-                if 'description' in skull and skull['description'] == 'You have been challenged...':
-                    kingsfallChallenge = skull['displayName']
-
     new_weekly = { 
             'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
-            'output': '\x02Weekly activities:\x02 {} || {} || {} || Heroic Strikes: {}'.format(weeklycrucible,kingsfallChallenge,coo_t3(datetime.date.today()), ', '.join(heroicstrike)) 
+            'output': '\x02Weekly activities:\x02 {} || {} || {} || Heroic Strikes: {}'.format(weeklycrucible,', '.join(kingsfallChallenge),coo_t3(datetime.date.today()), ', '.join(heroicstrike)) 
             }
 
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
