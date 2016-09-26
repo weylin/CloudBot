@@ -1046,29 +1046,29 @@ def lastpvp(text,nick,bot):
                 BASE_URL,activity['activityDetails']['instanceId']),headers=HEADERS).json()['Response']['data']
             for entry in pgcr['entries']:
                 if entry['characterId'] == char:
-                    
-                    if 'medalsActivityCompleteDeathless' in entry['extended']['values']: output.append('#MarkoftheUnbroken')
-                    if 'medalsActivityCompleteVictoryRumbleBlowout' in entry['extended']['values']: output.append('#SumofAllTears')
-                    if 'medalsActivityCompleteHighestScoreWinning' in entry['extended']['values']: output.append('#BestAround')
-                    if 'medalsActivityCompleteHighestScoreLosing' in entry['extended']['values']: output.append('#OntheBrightSide')
-                    if 'medalsActivityCompleteVictoryBlowout' in entry['extended']['values']: output.append('#DecisiveVictory')
-                    if 'medalsActivityCompleteVictoryMercy' in entry['extended']['values']: output.append('#NoMercy')
-                    if 'medalsActivityCompleteVictoryEliminationPerfect' in entry['extended']['values']: output.append('#Bulletproof')
-                    if 'medalsEliminationWipeSolo' in entry['extended']['values']: output.append('#WreckingBall')
-                    killSpree = ''
-                    if 'medalsKillSpree1' in entry['extended']['values']: killSpree = '#Merciless'
-                    if 'medalsKillSpree2' in entry['extended']['values']: killSpree = '#Relentless'
-                    if 'medalsKillSpree3' in entry['extended']['values']: killSpree = '#ReignOfTerror'
-                    if 'medalsKillSpreeAbsurd' in entry['extended']['values']: killSpree = '#WeRanOutOfMedals'
-                    if killSpree: output.append(killSpree)
-                    if 'medalsKillSpreeNoDamage' in entry['extended']['values']: output.append('#Phantom')
-                    killMulti = ''
-                    if 'medalsKillMulti3' in entry['extended']['values']: killMulti = '#TripleDown'
-                    if 'medalsKillMulti4' in entry['extended']['values']: killMulti = '#Breaker'
-                    if 'medalsKillMulti5' in entry['extended']['values']: killMulti = '#Slayer'
-                    if 'medalsKillMulti6' in entry['extended']['values']: killMulti = '#Reaper'
-                    if 'medalsKillMulti7' in entry['extended']['values']: killMulti = '#SeventhColumn'
-                    if killMulti: output.append(killMulti)
+                    if 'extended' in entry:
+                        if 'medalsActivityCompleteDeathless' in entry['extended']['values']: output.append('#MarkoftheUnbroken')
+                        if 'medalsActivityCompleteVictoryRumbleBlowout' in entry['extended']['values']: output.append('#SumofAllTears')
+                        if 'medalsActivityCompleteHighestScoreWinning' in entry['extended']['values']: output.append('#BestAround')
+                        if 'medalsActivityCompleteHighestScoreLosing' in entry['extended']['values']: output.append('#OntheBrightSide')
+                        if 'medalsActivityCompleteVictoryBlowout' in entry['extended']['values']: output.append('#DecisiveVictory')
+                        if 'medalsActivityCompleteVictoryMercy' in entry['extended']['values']: output.append('#NoMercy')
+                        if 'medalsActivityCompleteVictoryEliminationPerfect' in entry['extended']['values']: output.append('#Bulletproof')
+                        if 'medalsEliminationWipeSolo' in entry['extended']['values']: output.append('#WreckingBall')
+                        killSpree = ''
+                        if 'medalsKillSpree1' in entry['extended']['values']: killSpree = '#Merciless'
+                        if 'medalsKillSpree2' in entry['extended']['values']: killSpree = '#Relentless'
+                        if 'medalsKillSpree3' in entry['extended']['values']: killSpree = '#ReignOfTerror'
+                        if 'medalsKillSpreeAbsurd' in entry['extended']['values']: killSpree = '#WeRanOutOfMedals'
+                        if killSpree: output.append(killSpree)
+                        if 'medalsKillSpreeNoDamage' in entry['extended']['values']: output.append('#Phantom')
+                        killMulti = ''
+                        if 'medalsKillMulti3' in entry['extended']['values']: killMulti = '#TripleDown'
+                        if 'medalsKillMulti4' in entry['extended']['values']: killMulti = '#Breaker'
+                        if 'medalsKillMulti5' in entry['extended']['values']: killMulti = '#Slayer'
+                        if 'medalsKillMulti6' in entry['extended']['values']: killMulti = '#Reaper'
+                        if 'medalsKillMulti7' in entry['extended']['values']: killMulti = '#SeventhColumn'
+                        if killMulti: output.append(killMulti)
     return " ".join(output)
 
 @hook.command('coo')
