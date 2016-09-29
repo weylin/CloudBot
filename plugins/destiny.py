@@ -990,6 +990,60 @@ def triumphs(text,nick,bot):
             output.append(', '.join(missing))
     return ' '.join(output)
 
+
+@hook.command('wasted')
+def wasted(text,nick,bot):
+    if text:
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
+            membership = get_user(
+                ' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+        elif text.split(
+            ' ').pop().lower() in ['psn','ps','playstation','ps4']:
+            membership = get_user(
+                ' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+        else:
+            membership = get_user(text)
+            if type(membership) == str:
+                return 'A user by the name of {} was not found. \
+                Try specifying platform: psn or xbl'.format(text)
+    else:
+        membership = get_user(nick)
+
+    if type(membership) == str:
+        return membership
+
+    for platform in zip([1,2], ['xbox', 'playstation']):
+
+        if platform[0] in membership:
+            displayname = membership[platform[0]]['displayName']
+
+            output = []
+            blue = '\x02\x0312'
+            red = '\x02\x034'
+            end = '\x02\x03'
+            """ I'm setting these colors so that the output append is easier
+            to read. Also would like to expand defaults globally in the script
+            to make output easier to read and format. I'm not sure my names are
+            correct for the actual color being displayed though. """
+
+            waste = get(
+                'https://www.wastedondestiny.com/api/?console={}&user={}'.format(
+                    platform[0], displayname))
+            data = waste.json()  # Convert our get to json formatted data.
+
+            if data['Response'][platform[1]]:
+                timePlayed = (data['Response'][platform[1]].get('timePlayed', 0))
+                totalTimePlayed = str(datetime.timedelta(seconds=timePlayed))
+
+                timeWasted = (data['Response'][platform[1]].get('timeWasted', 0))
+                totalTimeWasted = str(datetime.timedelta(seconds=timeWasted))
+
+                output.append('{}Total:{} {} || {}Wasted:{} {}'.format(blue, end,
+                    totalTimePlayed, red, end, totalTimeWasted))
+
+                return output
+
+
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
     if text:
