@@ -1145,6 +1145,10 @@ def ping(text, bot):
 def ooboo(text, bot):
     return 'https://www.youtube.com/watch?v=HJKW2ZcRtMY'
 
+@hook.command('crispy')
+def crispy(text, bot):
+    return 'https://clips.twitch.tv/avcables/BloodyPartridgeAthenaPMS'
+
 @hook.command('100')
 def the100(bot):
     return 'Check out our The100.io group here: https://www.the100.io/g/1151'
