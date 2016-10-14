@@ -132,7 +132,7 @@ def prepare_lore_cache():
             for card in level2.get('cardCollection', []):
                 LORE_CACHE[card['cardName']] = {
                     'cardIntro': card.get('cardIntro', ''),
-                    'cardDescription': card['cardDescription'],
+                   # 'cardDescription': card['cardDescription'],
                     'cardId': card['cardId']
                 }
             for card in level2.get('cardBriefs', []):
@@ -877,19 +877,21 @@ def purge(text, nick, bot):
     user_name = nick
     output = []
     text = '' if not text else text
-
-    if text.lower() == 'xbl' and membership.get(1, False):
-        del membership[1]
-        output.append('Removed Xbox from my cache on {}.'.format(user_name))
-    if text.lower() == 'psn' and membership.get(2, False):
-        del membership[2]
-        output.append('Removed Playstation from my cache on {}.'.format(user_name))
-    if not text or not membership:
-        del CACHE[user_name]
-        return 'Removed {}\'s characters from my cache.'.format(nick)
-    else:
-        CACHE[user_name] = membership
-        return output if output else 'Nothing to purge. WTF you doin?!'
+    try:
+        if text.lower() == 'xbl' and membership.get(1, False):
+            del membership[1]
+            output.append('Removed Xbox from my cache on {}.'.format(user_name))
+        if text.lower() == 'psn' and membership.get(2, False):
+            del membership[2]
+            output.append('Removed Playstation from my cache on {}.'.format(user_name))
+        if not text or not membership:
+            del CACHE[user_name]
+            return 'Removed {}\'s characters from my cache.'.format(nick)
+        else:
+            CACHE[user_name] = membership
+            return output if output else 'Nothing to purge. WTF you doin?!'
+    except KeyError:
+        return 'Bro, do you even purge?!'
 
 @hook.command('profile')
 def profile(text, nick, bot):
