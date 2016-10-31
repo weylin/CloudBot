@@ -1155,6 +1155,10 @@ def crispy(text, bot):
 def grifflock(text, bot):
     return 'https://youtu.be/J8Hi7aPDxnc?t=1976'
 
+@hook.command('sunbarker')
+def sunbarker(text, bot):
+    return 'https://www.youtube.com/watch?v=oINaxm7QrbM'
+
 @hook.command('100')
 def the100(bot):
     return 'Check out our The100.io group here: https://www.the100.io/g/1151'
