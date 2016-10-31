@@ -534,9 +534,9 @@ def weekly(text,bot):
         for skull in skullCategory['skulls']:
             heroicstrike.append(skull['displayName'])
 
-    new_weekly = { 
-            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
-            'output': '\x02Weekly activities:\x02 {} || {} || {} || Heroic Strikes: {}'.format(weeklycrucible,', '.join(kingsfallChallenge),coo_t3(datetime.date.today()), ', '.join(heroicstrike)) 
+    new_weekly = {
+            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'],
+            'output': '\x02Weekly activities:\x02 {} || {} || {} || Heroic Strikes: {}'.format(weeklycrucible,', '.join(kingsfallChallenge),coo_t3(datetime.date.today()), ', '.join(heroicstrike))
             }
 
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
@@ -758,13 +758,13 @@ def lore(text, bot, notice):
 @hook.command('collection')
 def collection(text, nick, bot):
     if text:
-        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
             links = { 1: membership[1]['displayName']}
-        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
             links = { 2: membership[2]['displayName']}
-        else: 
+        else:
             membership = get_user(text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
@@ -1049,11 +1049,11 @@ def wasted(text,nick,bot):
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
     if text:
-        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']: 
+        if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
-        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']: 
+        elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
-        else: 
+        else:
             membership = get_user(text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
@@ -1079,17 +1079,17 @@ def lastpvp(text,nick,bot):
             output.append( '(' + CONSOLES[platform-1] + ')')
             if activity['values']['standing']['basic']['displayValue'] in ['Victory','1','2','3']:
                 output.append(
-                    '\x02\x033\u2713 ' + 
+                    '\x02\x033\u2713 ' +
                     get('{}Manifest/2/{}/'.format(
                         BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
-                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  +
                     '\x03\x02:')
             else:
                 output.append(
-                    '\x02\x034\u2717 ' + 
+                    '\x02\x034\u2717 ' +
                     get('{}Manifest/2/{}/'.format(
                         BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
-                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  + 
+                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  +
                     '\x03\x02:')
             output.append(
                 ', '.join([
@@ -1135,26 +1135,6 @@ def coo(bot):
 def rules(bot):
     return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
 
-@hook.command('compare')
-def compare(text, bot):
-    return 'Do it your fucking self, lazy bastard!'
-
-@hook.command('ping')
-def ping(text, bot):
-    return 'pong'
-
-@hook.command('ooboo')
-def ooboo(text, bot):
-    return 'https://www.youtube.com/watch?v=HJKW2ZcRtMY'
-
-@hook.command('crispy')
-def crispy(text, bot):
-    return 'https://clips.twitch.tv/avcables/BloodyPartridgeAthenaPMS'
-
-@hook.command('grifflock')
-def grifflock(text, bot):
-    return 'https://youtu.be/J8Hi7aPDxnc?t=1976'
-
 @hook.command('100')
 def the100(bot):
     return 'Check out our The100.io group here: https://www.the100.io/g/1151'
@@ -1172,13 +1152,3 @@ def news(bot):
     return '{} - {}'.format(
         feed['entries'][0]['summary'],
         try_shorten(feed['entries'][0]['link']))
-
-@hook.command('elo')
-def elo(bot):
-    lulz = [
-        'https://cdn.meme.am/instances/400x/54585027.jpg',
-        'http://blooperman.com/wp-content/uploads/2015/10/elo.jpg',
-        'http://blogs.discovermagazine.com/80beats/files/2011/07/Jello.jpg',
-        'https://media.giphy.com/media/3o7qEccSvsVHNT17Xi/giphy.gif'
-    ]
-    return try_shorten(choice(lulz))
