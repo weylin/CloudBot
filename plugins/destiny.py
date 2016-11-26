@@ -122,12 +122,16 @@ def prepare_lore_cache():
     LORE_CACHE = {}
     grim_tally = 0
     fragments = {}
+    siva = {}
     for level1 in lore_base:
         if level1.get('themeId','') == 'Enemies':
             for page in level1['pageCollection']:
                 if page['pageId'] == 'BooksofSorrow':
                     for card in page['cardCollection']:
                         fragments[card['cardId']] = card['cardName']
+                if page['pageId'] == 'Siva':
+                    for card in page['cardCollection']:
+                        siva[card['cardId']] = card['cardName']
         for level2 in level1.get('pageCollection', []):
             for card in level2.get('cardCollection', []):
                 LORE_CACHE[card['cardName']] = {
@@ -139,7 +143,7 @@ def prepare_lore_cache():
                 grim_tally += card.get('totalPoints', 0)
     CACHE['collections']['grim_tally'] = grim_tally
     CACHE['collections']['fragments'] = fragments
-
+    CACHE['collections']['siva'] = siva
 
 def best_weapon(data):
     best = 0
@@ -227,7 +231,7 @@ def load_cache(bot):
     if not CACHE.get('links'):
         CACHE['links'] = {}
     if not CACHE.get('collections'):
-        CACHE['collections'] = {'ghost_tally': 99}
+        CACHE['collections'] = {'ghost_tally': 142}
     try:
         with open('lore_cache', 'rb') as f:
             global LORE_CACHE
@@ -784,6 +788,7 @@ def collection(text, nick, bot):
             headers=HEADERS
         ).json()['Response']['data']
         found_frags = []
+        found_siva = []
         ghosts = 0
         for card in grimoire['cardCollection']:
             if 'fragments' not in CACHE['collections']:
@@ -794,15 +799,15 @@ def collection(text, nick, bot):
                 found_frags.append([card['cardId']])
             elif card['cardId'] == 103094:
                 ghosts = card['statisticCollection'][0]['displayValue']
-                if int(ghosts) >= 99:
-                    ghosts = 99
+            if card['cardId'] in CACHE['collections']['siva']:
+               found_siva.append([card['cardId']])
 
         if console == 1:
             platform = "xbl"
         else:
             platform = "psn"
 
-        output.append('{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{} - {}'.format(
+        output.append('{}: Grimoire {}/{}, Ghosts {}/{}, Fragments {}/{}, SIVA {}/{} - {}'.format(
             CONSOLES[console - 1],
             grimoire['score'],
             CACHE['collections']['grim_tally'],
@@ -810,6 +815,8 @@ def collection(text, nick, bot):
             CACHE['collections']['ghost_tally'],
             len(found_frags),
             len(CACHE['collections']['fragments']),
+            len(found_siva) -1,
+            len(CACHE['collections']['siva']) -1, #There are 31 cards, but only 30 associated with Cluster Pick-ups.
             try_shorten('http://destinystatus.com/{}/{}/grimoire'.format(
                 platform,
                 links[console]
