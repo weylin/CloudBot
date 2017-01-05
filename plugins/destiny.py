@@ -1,6 +1,7 @@
 import datetime
 import json
 from cloudbot import hook
+from cloudbot.event import EventType
 from html.parser import HTMLParser
 from random import choice, sample
 from requests import get
@@ -12,6 +13,7 @@ BASE_URL = 'https://www.bungie.net/platform/Destiny/'
 CACHE = {}
 CLASS_TYPES = {0: 'Titan ', 1: 'Hunter ', 2: 'Warlock ', 3: ''}
 CLASS_HASH = {671679327: 'Hunter', 3655393761: 'Titan', 2271682572: 'Warlock'}
+DISCORD_USER = "katagatame_"
 RACE_HASH = {898834093: 'Exo', 3887404748: 'Human', 2803282938: 'Awoken'}
 CONSOLES = ['\x02\x033Xbox\x02\x03', '\x02\x0312Playstation\x02\x03']
 STAT_HASHES = {144602215: 'Int', 1735777505: 'Disc', 4244567218: 'Str'}
@@ -64,6 +66,7 @@ def string_to_datetime(datetime_as_string):
 
 def datetime_to_string(datetime_object):
     return datetime.datetime.strftime(datetime_object,'%Y-%m-%dT%H:%M:%SZ')
+
 
 def get_user(user_name, console=None):
     '''
@@ -241,6 +244,12 @@ def load_cache(bot):
     except FileNotFoundError:
         LORE_CACHE = {}
 
+@hook.event([EventType.message, EventType.action], singlethread=True)
+def discord_tracker(event, db, conn):
+    if event.nick == 'DTG' and 'Command sent from Discord by' in event.content:
+        global DISCORD_USER
+        DISCORD_USER = event.content[event.content.find("by") + 3: -1]
+
 def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, notice):
     if not text:
         text = nick
@@ -375,6 +384,8 @@ def compile_stats_arg_parse(text_arr, given_nick):
 
 @hook.command('pvp')
 def pvp(text, nick, bot, notice):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
         'longestKillSpree', 'bestWeapon', 'secondsPlayed']
     split_defaults = ['k/d']
@@ -391,6 +402,8 @@ def pvp(text, nick, bot, notice):
 
 @hook.command('pve')
 def pve(text, nick, bot, notice):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
         'bestWeapon', 'secondsPlayed']
     split_defaults = ['k/d']
@@ -761,6 +774,8 @@ def lore(text, bot, notice):
 
 @hook.command('collection')
 def collection(text, nick, bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
@@ -826,6 +841,8 @@ def collection(text, nick, bot):
 
 @hook.command('link')
 def link(text, nick, bot, notice):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     text = text.lower().split(' ')
     err_msg = 'Invalid use of link command. Use: !link <gamertag> <xbl/psn>'
 
@@ -877,6 +894,8 @@ def migrate(text, nick, bot):
 
 @hook.command('purge')
 def purge(text, nick, bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     membership = get_user(nick)
 
     if type(membership) is not dict:
@@ -902,6 +921,8 @@ def purge(text, nick, bot):
 
 @hook.command('profile')
 def profile(text, nick, bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     text = nick if not text else text
     membership = get_user(text)
     if type(membership) is not dict:
@@ -924,6 +945,8 @@ def profile(text, nick, bot):
 
 @hook.command('chars')
 def chars(text, nick, bot, notice):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     text = nick if not text else text
     text = text.split(' ')
     CONSOLE2ID = {"xbox": 1, "playstation": 2}
@@ -964,6 +987,8 @@ def chars(text, nick, bot, notice):
 
 @hook.command('triumphs')
 def triumphs(text,nick,bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     Y2_MOT_HASH = {
         '1872531696':'Challenge of the Elders',
         '1872531697':'The Play\'s the Thing',
@@ -1002,6 +1027,8 @@ def triumphs(text,nick,bot):
 
 @hook.command('wasted')
 def wasted(text,nick,bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
             membership = get_user(
@@ -1055,6 +1082,8 @@ def wasted(text,nick,bot):
 
 @hook.command('lastpvp')
 def lastpvp(text,nick,bot):
+    if nick == 'DTG':
+        nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
             membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
