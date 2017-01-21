@@ -566,7 +566,7 @@ def weekly(text,bot):
                 ', '.join(kingsfallChallenge),
                 coo_t3(datetime.date.today()), 
                 ', '.join(heroicstrike)
-                ) 
+                ) }
 
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
         CACHE['last_weekly'] = CACHE['weekly']
