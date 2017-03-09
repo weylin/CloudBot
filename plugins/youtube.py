@@ -48,10 +48,10 @@ def get_video_description(video_id):
 
     if total_votes != 0:
         # format
-        likes = pluralize(int(statistics['likeCount']), "like")
-        dislikes = pluralize(int(statistics['dislikeCount']), "dislike")
+        likes = pluralize(int(statistics.get('likeCount', 0)), "like")
+        dislikes = pluralize(int(statistics.get('dislikeCount', 0)), "dislike")
 
-        percent = 100 * float(statistics['likeCount']) / total_votes
+        percent = 100 * float(statistics.get('likeCount', 0)) / total_votes
         out += ' - {}, {} (\x02{:.1f}\x02%)'.format(likes,
                                                     dislikes, percent)
 
