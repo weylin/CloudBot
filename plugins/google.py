@@ -73,4 +73,4 @@ def gse_gis(text):
     dimens = '{}x{}px'.format(metadata['width'], metadata['height'])
     size = filesize.size(int(metadata['byteSize']))
 
-    return u'{} [{}, {}, {}]'.format(result['link'], dimens, result['mime'], size)
+    return u'<{}> [{}, {}, {}]'.format(result['link'], dimens, result['mime'], size)
