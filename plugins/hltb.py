@@ -1,17 +1,11 @@
-import re
-
 import requests
-
-from cloudbot import hook
-from cloudbot.util import web
 from bs4 import BeautifulSoup
+from cloudbot import hook
 
 @hook.command("hltb")
-
 def hltb(text):
-    game = text
     url = "http://howlongtobeat.com/search_main.php?page=1"
-    payload = {"queryString": game,
+    payload = {"queryString": text,
                "t": "games",
                "sorthead": "popular",
                "sortd": "Normal Order",
@@ -27,41 +21,16 @@ def hltb(text):
     r = session.post(url, headers=test, data=payload)
 
     if len(r.content) < 250:
-        return bot.say("No results.")
+        return "No results."
 
-    bs = BeautifulSoup(r.content)
-
+    bs = BeautifulSoup(r.content, 'lxml')
     first = bs.findAll("div", {"class": "search_list_details"})[0]
-    name = first.a.text
+    output = ["\x02{}\x02 -".format(first.a.text)]
+    rest = first.findAll('div')
+    
+    entries = {2: '\x02{}\x02:', 3: '{}', 5: '\x02{}\x02:', 6: '{}', 8: '\x02{}\x02:', 9: '{}'}
+    for i in range(len(rest)):
+        if i in entries:
+            output.append(entries[i].format(rest[i].text))
 
-    try:
-        mainStory = first.findAll('div')[2].text + ': '
-    except Exception:
-        mainStory = ''
-
-    try:
-        time = first.findAll('div')[3].text
-    except Exception:
-        time = ''
-
-    try:
-        mainExtra = '- ' + first.findAll('div')[5].text + ': '
-    except Exception:
-        mainExtra = ''
-
-    try:
-        time2 = first.findAll('div')[6].text
-    except Exception:
-        time2 = ''
-
-    try:
-        completionist = '- ' + first.findAll('div')[8].text + ': '
-    except Exception:
-        completionist = ''
-
-    try:
-        time3 = first.findAll('div')[9].text
-    except Exception:
-        time3 = ''
-
-    return('\x02{}\x02 - \x02{}\x02 {} \x02{}\x02 {} \x02{}\x02 {}'.format(name, mainStory, time, mainExtra, time2, completionist, time3))
+    return ' '.join(output)
