@@ -1,5 +1,7 @@
 import requests
 import math
+import fuzzywuzzy
+from fuzzywuzzy import process
 
 from cloudbot import hook
 
@@ -18,20 +20,25 @@ def oc(text):
     'criteria': text
     }
   
-    response = requests.request("GET", searchURL, headers = headers, params = searchQuery)
+    response = requests.request("GET", searchURL, headers = headers, params = searchQuery).json()
 
-    gameID = response.json()[0]['id']
-    gameTitle = response.json()[0]['name']
-    gameLink = 'http://opencritic.com/game/' + str(gameID) + '/'
+    choices = [item['name'] for item in response]
+    best = process.extract(text,choices, limit=1)[0][0]
+        
+    for item in response:
+        if item['name'] == best:
+            gameID = item['id']
+            gameTitle = item['name']
+            gameLink = 'http://opencritic.com/game/' + str(gameID) + '/'
 
     scoreQuery = {
     'id': gameID
     }
 
-    response = requests.request("GET", scoreURL, headers = headers, params = scoreQuery)
+    response = requests.request("GET", scoreURL, headers = headers, params = scoreQuery).json()
 
     try:
-        gameScore = math.ceil(float(response.json()['score']))
+        gameScore = math.ceil(float(response['score']))
     except:
         return '\x02{}\x02 does not have an average score yet.'.format(gameTitle)
     else:
