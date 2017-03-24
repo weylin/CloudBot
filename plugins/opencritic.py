@@ -54,3 +54,32 @@ def octop(text):
         output.append('\x02{}\x02: {}'.format(i['name'], round(float(i['score']))))
 
     return ', '.join(output)
+
+@hook.command('ocup')
+def ocup(text):
+    url = 'http://api.opencritic.com/api/game/filter'
+
+    if text.lower() in {'switch', 'nintendo', 'nintendo switch'}:
+        text = '32'
+    elif text.lower() in {'sony', 'playstation', 'playstation 4', 'ps4', 'psn'}:
+        text = '6'
+    elif text.lower() in {'microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl'}:
+        text = '7'
+    elif text.lower() in {'windows', 'pc'}:
+        text = '27'
+    
+    headers = {
+    'content-type': "application/json",
+    }
+
+    data = '{"Platforms": [' + text + '], "limit": 5, "orderBy": "timeAscending", "startDate": "2017-3-24", "minTime": true}'
+
+    output = []
+
+    response = requests.post(url, headers = headers, data = data)
+
+    for i in response.json():
+        output.append('\x02{}\x02: {}'.format(i['name'], i['releaseDate'][:10]))
+
+    return ', '.join(output)
+
