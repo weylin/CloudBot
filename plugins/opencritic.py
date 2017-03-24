@@ -1,4 +1,5 @@
 import requests
+import datetime
 
 from cloudbot import hook
 
@@ -68,11 +69,13 @@ def ocup(text):
     elif text.lower() in {'windows', 'pc'}:
         text = '27'
     
+    startDate = datetime.datetime.now()
+    
     headers = {
     'content-type': "application/json",
     }
 
-    data = '{"Platforms": [' + text + '], "limit": 5, "orderBy": "timeAscending", "startDate": "2017-3-24", "minTime": true}'
+    data = '{"Platforms": [' + text + '], "limit": 5, "orderBy": "timeAscending", "startDate": "' + str(startDate) + '-3-24", "minTime": true}'
 
     output = []
 
@@ -82,4 +85,5 @@ def ocup(text):
         output.append('\x02{}\x02: {}'.format(i['name'], i['releaseDate'][:10]))
 
     return ', '.join(output)
+    return startDate
 
