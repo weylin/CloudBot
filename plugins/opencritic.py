@@ -30,7 +30,7 @@ def oc(text):
     response = requests.request("GET", scoreURL, headers = headers, params = scoreQuery)
 
     try:
-        gameScore = math.ceil(float(response.json()['score']))
+        gameScore = round(float(response.json()['score']))
     except:
         return '\x02{}\x02 does not have an average score yet.'.format(gameTitle)
     else:
