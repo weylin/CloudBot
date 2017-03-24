@@ -44,7 +44,7 @@ def octop(text):
     'content-type': "application/json",
     }
 
-    data = '{"limit": 10, "orderBy": "score", "startDate": "2017-1-1"}'
+    data = '{"limit": 5, "orderBy": "score", "startDate": "2017-1-1"}'
 
     output = []
 
