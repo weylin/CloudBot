@@ -1,5 +1,4 @@
 import requests
-import math
 
 from cloudbot import hook
 
@@ -36,3 +35,22 @@ def oc(text):
         return '\x02{}\x02 does not have an average score yet.'.format(gameTitle)
     else:
         return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(gameTitle, gameScore, gameLink)
+
+@hook.command('octop')
+def octop(text):
+    url = 'http://api.opencritic.com/api/game/filter'
+
+    headers = {
+    'content-type': "application/json",
+    }
+
+    data = '{"limit": 10, "orderBy": "score", "startDate": "2017-1-1"}'
+
+    output = []
+
+    response = requests.post(url, headers = headers, data = data)
+
+    for i in response.json():
+        output.append('\x02{}\x02: {}'.format(i['name'], round(float(i['score']))))
+
+    return ', '.join(output)
