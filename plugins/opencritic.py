@@ -1,5 +1,4 @@
 import requests
-import math
 import fuzzywuzzy
 from fuzzywuzzy import process
 
@@ -38,7 +37,7 @@ def oc(text):
     response = requests.request("GET", scoreURL, headers = headers, params = scoreQuery).json()
 
     try:
-        gameScore = math.ceil(float(response['score']))
+        gameScore = round(float(response['score']))
     except:
         return '\x02{}\x02 does not have an average score yet.'.format(gameTitle)
     else:
