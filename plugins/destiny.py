@@ -67,6 +67,18 @@ def string_to_datetime(datetime_as_string):
 def datetime_to_string(datetime_object):
     return datetime.datetime.strftime(datetime_object,'%Y-%m-%dT%H:%M:%SZ')
 
+def get_advisors(text=''):
+    if text.lower() in ['clear', 'purge', 'flush', 'new', 'refresh']:
+        del CACHE['advisors']
+    if 'advisors' in CACHE and str(datetime.datetime.now()) > CACHE['advisors']['activities']['weeklycrucible']['status']['expirationDate']:
+        CACHE['last_advisors'] = CACHE['advisors']
+        del CACHE['advisors']
+    if 'advisors' not in CACHE:
+        try:
+            CACHE['advisors'] = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+        except: 
+            return 'Error: unable to get Advisors'
+    return CACHE['advisors']
 
 def get_user(user_name, console=None):
     '''
@@ -520,52 +532,49 @@ def daily(text,bot):
 
 @hook.command('weekly')
 def weekly(text,bot):
-    if 'flush' in text.lower(): CACHE['weekly'] = {}
+    
     if 'last' in text.lower():
         try:
             return CACHE['last_weekly']['output']
         except KeyError:
             return 'Unavailable.'
-    if (
-        'weekly' in CACHE and
-        CACHE['weekly'] != {} and
-        datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['weekly']['expiration'],'%Y-%m-%dT%H:%M:%SZ')
-        ):
-        return CACHE['weekly']['output']
 
-    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+    advisors = get_advisors(text) 
+    if type(advisors) is str: return advisors
+    
+    weeklyfeaturedraid_challenges = []
+    for skull in advisors['activities']['weeklyfeaturedraid']['activityTiers'][0]['skullCategories'][0]['skulls']:
+        if 'Challenge' in skull['displayName']:
+            weeklyfeaturedraid_challenges.append(skull['displayName'])
+
+    weeklyfeaturedraid = '{}: {}'.format(
+        get('{}Manifest/1/{}/'.format(BASE_URL,
+            advisors['activities']['weeklyfeaturedraid']['display']['activityHash']),
+            headers=HEADERS).json()['Response']['data']['activity']['activityName'],
+         ', '.join(weeklyfeaturedraid_challenges))
 
     weeklycrucible = get('{}Manifest/1/{}/'.format(
         BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),
         headers=HEADERS).json()['Response']['data']['activity']['activityName']
 
-    kingsfallChallenge = []
-    for activity in advisors['activities']['kingsfall']['activityTiers']:
-        for skullCategory in activity['skullCategories']:
-            for skull in skullCategory['skulls']:
-                if 'description' in skull and skull['description'] == 'You have been challenged...':
-                    if skull['displayName'] not in kingsfallChallenge: kingsfallChallenge.append(skull['displayName'])
-
-    wotmChallenge = []
-    for activity in advisors['activities']['wrathofthemachine']['activityTiers']:
-        for skullCategory in activity['skullCategories']:
-            for skull in skullCategory['skulls']:
-                if 'description' in skull and skull['description'] == 'You have been challenged...':
-                    if skull['displayName'] not in wotmChallenge: wotmChallenge.append(skull['displayName'])
-
     heroicstrike = []
     for skullCategory in advisors['activities']['heroicstrike']['extended']['skullCategories']:
         for skull in skullCategory['skulls']:
-            heroicstrike.append(skull['displayName'])
+            if 'Heroic' not in skull['displayName']:
+                heroicstrike.append(skull['displayName'])
+
+    weeklystory = []
+    for skullCategory in advisors['activities']['weeklystory']['extended']['skullCategories']:
+        for skull in skullCategory['skulls']:
+            if 'Heroic' not in skull['displayName']:
+                weeklystory.append(skull['displayName'])
             
     new_weekly = { 
-            'expiration': advisors['activities']['weeklycrucible']['status']['expirationDate'], 
-            'output': '\x02Weekly activities:\x02 {} || {} || {} || {} || Heroic Strikes: {}'.format(
-                weeklycrucible, 
-                ', '.join(wotmChallenge),
-                ', '.join(kingsfallChallenge),
-                coo_t3(datetime.date.today()), 
-                ', '.join(heroicstrike)
+            'output': '\x02Weekly activities:\x02 {} || Strikes: {} || Story: {} || Crucible: {}'.format(
+                weeklyfeaturedraid,
+                ', '.join(heroicstrike),
+                ', '.join(weeklystory),
+                weeklycrucible
                 ) }
 
     if 'weekly' in CACHE and new_weekly != CACHE['weekly']:
