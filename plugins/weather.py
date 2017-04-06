@@ -21,9 +21,15 @@ table = Table(
 # Define some constants
 google_base = 'https://maps.googleapis.com/maps/api/'
 geocode_api = google_base + 'geocode/json'
+
+api_sources = { 
+    'darksky': 'https://api.darksky.net/forecast/{}/{}',
+    'wunderground': 'http://api.wunderground.com/api/{}/forecast/geolookup/conditions/q/{}.json'
+}
+
+weather_base = api_sources[source]
  
-wunder_api = "http://api.wunderground.com/api/{}/forecast/geolookup/conditions/q/{}.json"
- 
+# Wunderground specific:
 # Change this to a ccTLD code (eg. uk, nz) to make results more targeted towards that specific country.
 # <https://developers.google.com/maps/documentation/geocoding/#RegionCodes>
 bias = None
@@ -47,7 +53,9 @@ def check_status(status):
     elif status == 'OK':
         return None
  
- 
+def to_c(ftemp):
+    return (ftemp - 32) * (5/9)
+
 def find_location(location):
     """
     Takes a location as a string, and returns a dict of data
@@ -89,7 +97,7 @@ def add_location(nick, location, db):
 @hook.on_start
 def on_start(bot, db):
     """ Loads API keys """
-    global dev_key, wunder_key
+    global dev_key, weatherapi_key
     dev_key = bot.config.get("api_keys", {}).get("google_dev_key", None)
     wunder_key = bot.config.get("api_keys", {}).get("wunderground", None)
     load_cache(db)
@@ -107,8 +115,8 @@ def get_location(nick):
 @hook.command("weather", "we", autohelp=False)
 def weather(text, reply, db, nick, notice):
     """weather <location> -- Gets weather data for <location>."""
-    if not wunder_key:
-        return "This command requires a Weather Underground API key."
+    if not weatherapi_key:
+        return 'No API key found for {}'.format(source)
     if not dev_key:
         return "This command requires a Google Developers Console API key."
 
@@ -129,7 +137,8 @@ def weather(text, reply, db, nick, notice):
  
     formatted_location = "{lat},{lng}".format(**location_data)
  
-    url = wunder_api.format(wunder_key, formatted_location)
+    url = weather_base.format(weatherapi_key, formatted_location)
+    
     response = requests.get(url).json()
  
     if response['response'].get('error'):
