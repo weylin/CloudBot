@@ -70,7 +70,7 @@ def datetime_to_string(datetime_object):
 def get_advisors(text=''):
     if text.lower() in ['clear', 'purge', 'flush', 'new', 'refresh']:
         del CACHE['advisors']
-    if 'advisors' in CACHE and str(datetime.datetime.now()) > CACHE['advisors']['activities']['weeklycrucible']['status']['expirationDate']:
+    if 'advisors' in CACHE and str(datetime.datetime.utcnow()) > CACHE['advisors']['activities']['weeklycrucible']['status']['expirationDate']:
         CACHE['last_advisors'] = CACHE['advisors']
         del CACHE['advisors']
     if 'advisors' not in CACHE:
