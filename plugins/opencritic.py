@@ -73,6 +73,16 @@ def ocup(text):
         text = '7'
     elif text.lower() in {'windows', 'pc'}:
         text = '27'
+    elif text.lower() in {'3ds'}:
+        text = '36'
+    elif text.lower() in {'vive', 'htc', 'htc vive'}:
+        text = '30'
+    elif text.lower() in {'rift', 'oculus', 'oculus rift'}:
+        text = '29'
+    elif text.lower() in {'vr'}:
+        text = '29,30'
+    elif text.lower() in {'vita', 'ps vita', 'psp'}:
+        text = '33'
     
     startDate = datetime.datetime.now()
     
@@ -90,5 +100,4 @@ def ocup(text):
         output.append('\x02{}\x02: {}'.format(i['name'], i['releaseDate'][:10]))
 
     return ', '.join(output)
-    return startDate
 
