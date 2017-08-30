@@ -1192,14 +1192,6 @@ def coo(bot):
 def rules(bot):
     return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
 
-@hook.command('100')
-def the100(bot):
-    return 'Check out our The100.io group here: https://www.the100.io/g/1151'
-
-@hook.command('clan')
-def clan(bot):
-    return 'Check out our Clan: https://www.bungie.net/en/Clan/Detail/939927'
-
 @hook.command('news')
 def news(bot):
     feed = parse('https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1')
