@@ -59,6 +59,7 @@ config*.json
 *.mmdb
 *.log
 .idea/
+.vagrant/
 destiny_cache
 lore_cache
 destiny_rpg
