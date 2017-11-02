@@ -166,11 +166,13 @@ def gen_manifest_pickle(force=False):
     pickles = glob.glob('destiny_manifest_*.pickle')
 
     # If more than one pickle, only keep latest one
-    if len(pickles) > 1:
+    if len(pickles) == 1:
+        local_filename = pickles[0]
+    elif len(pickles) > 1:
         os.remove(sorted(pickles)[0])
         local_filename = sorted(pickles)[-1]
     else:
-        local_filename = pickles[0]
+        pass
 
     # Check if pickle exists, if not, create one 
     if len(pickles) == 0:
