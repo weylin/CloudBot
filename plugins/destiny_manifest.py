@@ -46,62 +46,70 @@ hash_dict = {
     'DestinyHistoricalStatsDefinition': 'statId'
 }
 
+HEADERS = {}
+
+class DestinyManifestException(Exception):
+    pass
+
+
 def __get_manifest():
     manifest_url = 'https://www.bungie.net/Platform/Destiny2/Manifest/'
-    
+
     # Get the manifest location from the json
-    r = requests.get(manifest_url)
-    manifest = r.json()
+    manifest = requests.get(manifest_url, headers=HEADERS).json()
+
     try:
         mani_url = 'https://www.bungie.net' + manifest['Response']['mobileWorldContentPaths']['en']
     except KeyError:
-        print "Error fetching the manifest URL. Here's the response: {}".format(manifest)
-    
+        err_msg = "Error fetching the manifest URL. Status: '{}' Message: '{}'".format(manifest['ErrorStatus'], manifest['Message'])
+        raise DestinyManifestException(err_msg)
+
+
     #Download the file, write it to MANZIP
     r = requests.get(mani_url)
     with open("DESTINYMANZIP", "wb") as zip:
         zip.write(r.content)
-    print "Download Complete!"
-    
+    print("Download Complete!")
+
     #Extract the file contents, and rename the extracted file
     # to 'Manifest.content'
     with zipfile.ZipFile('DESTINYMANZIP') as zip:
         name = zip.namelist()
         zip.extractall()
     os.rename(name[0], 'Manifest.content')
-    print 'Unzipped!'
-               
+    print('Unzipped!')
+
 def __build_dict(hash_dict):
     #connect to the manifest
     con = sqlite3.connect('Manifest.content')
-    print 'Connected'
+    print('Connected')
     #create a cursor object
     cur = con.cursor()
-    
+
     all_data = {}
     #for every table name in the dictionary
     for table_name in hash_dict.keys():
         #get a list of all the jsons from the table
         cur.execute('SELECT json from ' + table_name)
-        print 'Generating '+table_name+' dictionary....'
-        
+        print('Generating '+table_name+' dictionary....')
+
         #this returns a list of tuples: the first item in each tuple is our json
         items = cur.fetchall()
-        
+
         #create a list of jsons
         item_jsons = [json.loads(item[0]) for item in items]
-        
+
         #create a dictionary with the hashes as keys
         #and the jsons as values
         item_dict = {}
         item_hash = hash_dict[table_name]
-        for item in item_jsons:   
+        for item in item_jsons:
             item_dict[item[item_hash]] = item
-    
+
         #add that dictionary to our all_data using the name of the table
-        #as a key. 
-        all_data[table_name] = item_dict 
-    print 'Dictionary Generated!'
+        #as a key.
+        all_data[table_name] = item_dict
+    print('Dictionary Generated!')
     return all_data
 
 def __get_manifest_version():
@@ -111,36 +119,40 @@ def __get_manifest_version():
     try:
         manifest_version = manifest['Response']['version']
     except KeyError:
-        print "Error fetching the manifest version. Here's the response: {}".format(manifest)
+        err_msg = "Error fetching the manifest version. Status: '{}' Message: '{}'".format(manifest['ErrorStatus'], manifest['Message'])
+        raise DestinyManifestException(err_msg)
     else:
         return manifest_version
 
 def __create_manifest():
     __get_manifest()
-    version = __get_manifest_version()        
+    version = __get_manifest_version()
     all_data = __build_dict(hash_dict)
-    filename = 'destiny_manifest_{}.pickle'.format(version) 
+    filename = 'destiny_manifest_{}.pickle'.format(version)
     with open(filename, 'wb') as data:
         pickle.dump(all_data, data)
-    print "{} created!\nDONE!".format(filename)
+    print("{} created!\nDONE!".format(filename))
 
 def __cleanup_files(filename):
     try:
         os.remove('DESTINYMANZIP')
     except OSError:
-        print 'DESTINYMANZIP not found. Skipping...'
+        print('DESTINYMANZIP not found. Skipping...')
 
     try:
         os.remove('Manifest.content')
     except OSError:
-        print 'Manifest.content not found. Skipping...'
+        print('Manifest.content not found. Skipping...')
 
     try:
         os.remove(filename)
     except OSError:
-        print '{} not found. Nothing to delete!'.format(filename)
+        print('{} not found. Nothing to delete!'.format(filename))
 
-def is_manifest_current():
+def is_manifest_current(key):
+    global HEADERS
+    HEADERS = {'X-API-Key': key}
+
     # Get manifest version
     remote_version = __get_manifest_version()
 
@@ -161,7 +173,10 @@ def is_manifest_current():
 
     return local_version >= remote_version
 
-def gen_manifest_pickle(force=False):
+def gen_manifest_pickle(key, force=False):
+    global HEADERS
+    HEADERS = {'X-API-Key': key}
+
     # Get any existing manifest pickles
     pickles = glob.glob('destiny_manifest_*.pickle')
 
@@ -174,19 +189,21 @@ def gen_manifest_pickle(force=False):
     else:
         pass
 
-    # Check if pickle exists, if not, create one 
+    # Check if pickle exists, if not, create one
     if len(pickles) == 0:
-        print 'Generating new Destiny manifest pickle...'
+        print('Generating new Destiny manifest pickle...')
         __create_manifest()
+        return 'New Destiny manifest pickle created!'
     elif force or not is_manifest_current():
-        print 'Destiny manifest pickle out of date, generating new one...'
-        print 'Deleting old pickle: {}...'.format(local_filename)
+        print('Destiny manifest pickle out of date, generating new one...')
+        print('Deleting old pickle: {}...'.format(local_filename))
         __cleanup_files(local_filename)
 
-        print 'Generating new Destiny manifest pickle...'
+        print('Generating new Destiny manifest pickle...')
         __create_manifest()
+        return 'Destiny manifest pickle updated'
     else:
-        print 'Pickle exists and is up to date!'
+        return 'Pickle exists and is up to date!'
 
 if __name__ == '__main__':
     gen_manifest_pickle()
