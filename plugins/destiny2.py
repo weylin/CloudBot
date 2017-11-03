@@ -1,10 +1,14 @@
+import datetime
 import glob
 import pickle
 import sys
 import traceback
+import urllib
 import urllib.parse
 
+from bs4 import BeautifulSoup
 import requests
+from dateutil.relativedelta import relativedelta, FR
 
 from cloudbot import hook
 from cloudbot.event import EventType
@@ -102,3 +106,57 @@ def item_search(text, bot):
             result['hash']
         ))
     return output[:3]
+
+# Name: Xûr, vendor hash: 2190858386, milestone hash: 534869653
+@hook.command('xur')
+def xur(text, bot):
+    # reset happens at 9am UTC, so subtract that to simplify the math
+    now = datetime.datetime.utcnow() - datetime.timedelta(hours=9)
+
+    # xur is available from friday's reset until sunday's reset, i.e. friday (4) and saturday (5)
+    if now.weekday() not in [4, 5] or not 'last' in text.lower():
+        xursday_diff = 4 - now.weekday()
+        if xursday_diff < -1: # if past saturday, bump to next week
+            xursday_diff += 7
+
+        xursday = (now + datetime.timedelta(days=xursday_diff)).replace(hour=0, minute=0, second=0, microsecond=0)
+        time_to_xursday = xursday - now
+
+        s = time_to_xursday.seconds
+        h, s = divmod(s, 3600)
+        m, s = divmod(s, 60)
+
+        output = []
+
+        if time_to_xursday.days > 0:
+            output.append('{} days'.format(time_to_xursday.days))
+
+        if h: output.append('{} hours'.format(h))
+        if m: output.append('{} minutes'.format(m))
+        if s: output.append('{} seconds'.format(s))
+
+        return '\x02Xûr will return in\x02 {}'.format(', '.join(output))
+
+    # Build URL
+    recent_fri = datetime.datetime.now() + relativedelta(weekday=FR(-1))
+    page_url = 'https://whereisxur.com/xur-location-destiny-2-{}/'.format(recent_fri.strftime('%m-%-d-%Y'))
+
+    # Get page
+    page = urllib.request.urlopen(page_url)
+    soup = BeautifulSoup(page, 'html.parser')
+
+    # Get the location
+    loc = soup.find('h4', attrs={'class': 'title'}).text
+    location = ' '.join(loc.split()[:-1])
+
+    # Get the items
+    item_row = soup.find('div', attrs={'class': 'et_pb_row_5'})
+    xur_items = []
+
+    for child in item_row.children:
+        name = child.find('h4')
+        if name != -1:
+            xur_items.append(name.text)
+
+    output = "\x02Xûr\x02 -- Location: {}; Items: {}".format(location, ", ".join(xur_items))
+    return output

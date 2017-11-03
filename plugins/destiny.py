@@ -76,7 +76,7 @@ def get_advisors(text=''):
     if 'advisors' not in CACHE:
         try:
             CACHE['advisors'] = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
-        except: 
+        except:
             return 'Error: unable to get Advisors'
     return CACHE['advisors']
 
@@ -532,16 +532,16 @@ def daily(text,bot):
 
 @hook.command('weekly')
 def weekly(text,bot):
-    
+
     if 'last' in text.lower():
         try:
             return CACHE['last_weekly']['output']
         except KeyError:
             return 'Unavailable.'
 
-    advisors = get_advisors(text) 
+    advisors = get_advisors(text)
     if type(advisors) is str: return advisors
-    
+
     weeklyfeaturedraid_challenges = []
     for skull in advisors['activities']['weeklyfeaturedraid']['activityTiers'][0]['skullCategories'][0]['skulls']:
         if 'Challenge' in skull['displayName']:
@@ -568,8 +568,8 @@ def weekly(text,bot):
         for skull in skullCategory['skulls']:
             if 'Heroic' not in skull['displayName']:
                 weeklystory.append(skull['displayName'])
-            
-    new_weekly = { 
+
+    new_weekly = {
             'output': '\x02Weekly activities:\x02 {} || Strikes: {} || Story: {} || Crucible: {}'.format(
                 weeklyfeaturedraid,
                 ', '.join(heroicstrike),
@@ -631,7 +631,7 @@ def coe(text,bot):
         CACHE['coe'] = output
         return output
 
-@hook.command('xur')
+@hook.command('d1xur')
 def xur(text, bot):
     if 'last' in text.lower():
         return CACHE.get('last_xur', 'Unavailable')
