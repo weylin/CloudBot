@@ -114,8 +114,7 @@ def __build_dict(hash_dict):
 
 def __get_manifest_version():
     manifest_url = 'https://www.bungie.net/Platform/Destiny2/Manifest/'
-    r = requests.get(manifest_url)
-    manifest = r.json()
+    manifest = requests.get(manifest_url, headers=HEADERS).json()
     try:
         manifest_version = manifest['Response']['version']
     except KeyError:
@@ -132,6 +131,7 @@ def __create_manifest():
     with open(filename, 'wb') as data:
         pickle.dump(all_data, data)
     print("{} created!\nDONE!".format(filename))
+    return filename
 
 def __cleanup_files(filename):
     try:
@@ -192,15 +192,15 @@ def gen_manifest_pickle(key, force=False):
     # Check if pickle exists, if not, create one
     if len(pickles) == 0:
         print('Generating new Destiny manifest pickle...')
-        __create_manifest()
-        return 'New Destiny manifest pickle created!'
+        filename = __create_manifest()
+        return filename
     elif force or not is_manifest_current():
         print('Destiny manifest pickle out of date, generating new one...')
         print('Deleting old pickle: {}...'.format(local_filename))
         __cleanup_files(local_filename)
 
         print('Generating new Destiny manifest pickle...')
-        __create_manifest()
+        filename = __create_manifest()
         return 'Destiny manifest pickle updated'
     else:
         return 'Pickle exists and is up to date!'
