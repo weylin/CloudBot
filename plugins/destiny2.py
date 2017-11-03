@@ -41,18 +41,37 @@ def load_cache(bot):
     except EOFError:
         MANIFEST = {}
 
-@hook.periodic(24 * 60 * 60, initial_interval=10)
+@hook.event([EventType.message, EventType.action], singlethread=True)
+def discord_tracker(event, db, conn):
+    if event.nick == 'DTG' and 'Command sent from Discord by' in event.content:
+        global DISCORD_USER
+        DISCORD_USER = event.content[event.content.find("by") + 3: -1]
+
+@hook.periodic(24 * 60 * 60, initial_interval=30)
 def check_manifest(bot):
-	api_key = bot.config.get('api_keys', {}).get('destiny', None)
-	conn = bot.connections["DTG"]
-	current = False
-	try:
-		current = destiny_manifest.is_manifest_current(api_key)
-	except Exception as e:
-		exc_type, exc_value, exc_traceback = sys.exc_info()
-		traceback.print_exception(exc_type, exc_value, exc_traceback,
+    api_key = bot.config.get('api_keys', {}).get('destiny', None)
+    conn = bot.connections["DTG"]
+    current = False
+    try:
+        current = destiny_manifest.is_manifest_current(api_key)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        traceback.print_exception(exc_type, exc_value, exc_traceback,
                           limit=2, file=sys.stdout)
-		conn.message("#DTGCoding", "Error! {}".format(e))
+        conn.message("#DTGCoding", "Error! {}".format(e))
+
+    if not current:
+        try:
+            result = destiny_manifest.gen_manifest_pickle(api_key)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                      limit=2, file=sys.stdout)
+            conn.message("#DTGCoding", "Manifest error: {}".format(e))
+        else:
+            conn.message("#DTGCoding", result)
+    else:
+        print("Destiny manifest is current!")
 
 	if not current:
 		try:
