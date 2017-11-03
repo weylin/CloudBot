@@ -73,13 +73,32 @@ def check_manifest(bot):
     else:
         print("Destiny manifest is current!")
 
-	if not current:
-		try:
-			result = destiny_manifest.gen_manifest_pickle(api_key)
-		except Exception as e:
-			exc_type, exc_value, exc_traceback = sys.exc_info()
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                              limit=2, file=sys.stdout)
-			conn.message("#DTGCoding", "Error! {}".format(e))
-		else:
-			conn.message("#DTGCoding", result)
+@hook.command('item')
+def item_search(text, bot):
+    '''
+    Expects the text to be a valid object in the Destiny database
+    Returns the item's name and description.
+    TODO: Implement error checking
+    '''
+    item = urllib.parse.quote(text.strip())
+    item_query = '{}Destiny2/Armory/Search/DestinyInventoryItemDefinition/{}'.format(BASE_URL, item)
+    response = requests.get(item_query, headers=HEADERS).json()
+
+    if response['ErrorCode'] == 1:
+        item_results = response['Response']['results']['results']
+    else:
+        return 'Error: {}'.format(response['Message'])
+
+    output = []
+    for item in item_results:
+        item_hash = item['hash']
+        result = MANIFEST['DestinyInventoryItemDefinition'][item_hash]
+
+        output.append('\x02{}\x02 ({}{}) - \x1D{}\x1D - http://db.destinytracker.com/d2/en/items/{}'.format(
+            result['displayProperties']['name'],
+            CLASS_TYPES[result['classType']],
+            result['itemTypeAndTierDisplayName'],
+            result['displayProperties'].get('description', 'Item has no description.'),
+            result['hash']
+        ))
+    return output[:3]
