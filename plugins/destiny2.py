@@ -160,3 +160,35 @@ def xur(text, bot):
 
     output = "\x02Xûr\x02 -- Location: {}; Items: {}".format(location, ", ".join(xur_items))
     return output
+
+@hook.command('nightfall', 'nf')
+def nightfall(text, bot):
+    milestones_url = '{}Destiny2/Milestones/'.format(BASE_URL)
+    response = requests.get(milestones_url, headers=HEADERS).json()
+
+    if response['ErrorCode'] == 1:
+        nightfall = response['Response']['2171429505']
+    else:
+        return 'Error: {}'.format(response['Message'])
+
+    nightfall_activity_hash = nightfall["availableQuests"][0]["activity"]["activityHash"]
+    nightfall_name = MANIFEST['DestinyActivityDefinition'][nightfall_activity_hash]['displayProperties']['name']
+    nightfall_desc = MANIFEST['DestinyActivityDefinition'][nightfall_activity_hash]['displayProperties']['description']
+
+    api_modifiers = nightfall["availableQuests"][0]["activity"]["modifierHashes"]
+    modifiers = []
+    for modifier in api_modifiers:
+        modifiers.append(MANIFEST['DestinyActivityModifierDefinition'][modifier]['displayProperties']['name'])
+
+    api_challenges = nightfall['availableQuests'][0]['challenges']
+    challenges = []
+    for challenge in api_challenges:
+        challenges.append(MANIFEST['DestinyObjectiveDefinition'][challenge['objectiveHash']]['displayProperties']['name'])
+
+    output = '\x02{}\x02 - \x1D{}\x1D \x02Modifiers:\x02 {} \x02Challenges:\x02 {}'.format(
+                                                        nightfall_name,
+                                                        nightfall_desc,
+                                                        ', '.join(modifiers),
+                                                        ', '.join(challenges[:2])
+                                                    )
+    return output
