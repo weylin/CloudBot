@@ -1,6 +1,7 @@
 from io import BytesIO
 import datetime
 import glob
+import json
 import os
 import pickle
 import platform
@@ -26,6 +27,7 @@ from . import destiny_manifest
 
 BASE_URL = 'https://www.bungie.net/Platform/'
 CLASS_TYPES = {0: 'Titan ', 1: 'Hunter ', 2: 'Warlock ', 3: ''}
+
 
 @hook.on_start()
 def load_cache(bot):
@@ -203,92 +205,28 @@ def nightfall(text, bot):
                                                     )
     return output
 
-def get_chromedriver():
-    driver = glob.glob('chromedriver')
-    sys_plat = platform.system()
-
-    if sys_plat == 'Linux':
-        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_mac64.zip'
-    elif sys_plat == 'Darwin':
-        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_mac64.zip'
-    elif sys_plat == 'Windows':
-        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_win32.zip'
-    else:
-        raise Exception('Invalid platform')
-
-    if len(driver) == 1:
-        pass
-    elif len(driver) > 1:
-        raise Exception('Too many chromedrivers!')
-    else:
-        request = get(target)
-        zip_file = ZipFile(BytesIO(request.content))
-        zip_file.extractall()
-        zip_file.close()
-
-        # Permissions hackery
-        st = os.stat('chromedriver')
-        os.chmod('chromedriver', st.st_mode | 0o111)
-
-# TODO: Unfinished
+# Milestone hash: 3551755444
 @hook.command('trials')
 def trials(text, bot):
-    if 'flush' in text.lower(): CACHE['trials'] = {}
-    if 'last' in text.lower():
-        try:
-            return CACHE['last_trials']['output']
-        except KeyError:
-            return 'Unavailable.'
-    if 'trials' in CACHE:
-        if 'expiration' in CACHE['trials']:
-            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['expiration']):
-                return CACHE['trials']['output']
-        if 'nextStart' in CACHE['trials']:
-            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['nextStart']):
-                time_to_trials = string_to_datetime(CACHE['trials']['nextStart']) - datetime.datetime.utcnow()
-                s = time_to_trials.seconds
-                h, s = divmod(s, 3600)
-                m, s = divmod(s, 60)
-                output = []
-                if time_to_trials.days > 0:
-                    output.append('{} days'.format(time_to_trials.days))
-                if h: output.append('{} hours'.format(h))
-                if m: output.append('{} minutes'.format(m))
-                if s: output.append('{} seconds'.format(s))
-                return '\x02Trials of Osiris will return in\x02 {}'.format(', '.join(output))
+    trials_info = requests.get('https://api.trialsofthenine.com/week/0/').json()
 
-    # Get ChromeDriver if not present
-    get_chromedriver()
+    if not trials_info['Status'] == 'Success':
+        return 'Error fetching Trials info'
 
-    # Initialize display and driver
-    display = Display(visible=0, size=(800, 600))
-    display.start()
-    browser = webdriver.Chrome("chromedriver")
+    status = False
 
-    # Get the page
-    url = "https://trials.report/"
-    browser.get(url) # navigate to the page
-    sleep(randint(2,3)) # sleep to make sure we get it
-    page = browser.execute_script("return document.body.innerHTML") # returns the inner HTML as a string
+    now = datetime.datetime.utcnow()
+    begin = datetime.datetime.strptime(trials_info['Response']['startDate'],'%Y-%m-%d %H:%M:%S')
+    end = datetime.datetime.strptime(trials_info['Response']['endDate'],'%Y-%m-%d %H:%M:%S')
 
-    # Parse for info
-    soup = BeautifulSoup(page, 'html.parser')
+    if begin < now < end:
+        status = True
 
-    # Get the location
-    loc = soup.find('h2', attrs={'class': 'card__title'}).text
-    trials_map = loc.strip()
+    if not status:
+        return '\x02Trials of the Nine:\x02 Unavailable.'
 
-    # Shutdown display and driver
-    display.stop()
-    browser.quit()
+    if trials_info['Status'] == 'Success':
+        trials_map = trials_info['Response']['name']
+        trials_mode = trials_info['Response']['mode']
 
-    new_trials= {
-        'expiration': advisors['status']['expirationDate'],
-        'nextStart': datetime_to_string(string_to_datetime(advisors['status']['startDate']) + datetime.timedelta(days=7)),
-        'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map)
-    }
-
-    if 'trials' in CACHE and new_trials != CACHE['trials']:
-        CACHE['last_trials'] = CACHE['trials']
-    CACHE['trials'] = new_trials
-    return new_trials['output']
+    return '\x02Trials of the Nine:\x02 {} on {}'.format(trials_mode, trials_map)
