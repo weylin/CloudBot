@@ -126,7 +126,7 @@ def xur(text, bot):
     now = datetime.datetime.utcnow() - datetime.timedelta(hours=9)
 
     # xur is available from friday's reset until sunday's reset, i.e. friday (4) and saturday (5)
-    if now.weekday() not in [4, 5] or not 'last' in text.lower():
+    if now.weekday() not in [4, 5, 6, 0]:
         xursday_diff = 4 - now.weekday()
         if xursday_diff < -1: # if past saturday, bump to next week
             xursday_diff += 7
