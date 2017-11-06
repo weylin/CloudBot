@@ -1,18 +1,28 @@
+from io import BytesIO
 import datetime
 import glob
+import os
 import pickle
+import platform
+from random import randint
+import stat
 import sys
+from time import sleep
 import traceback
 import urllib
 import urllib.parse
+from zipfile import ZipFile
 
 from bs4 import BeautifulSoup
+from pyvirtualdisplay import Display
 import requests
 from dateutil.relativedelta import relativedelta, FR
+from selenium import webdriver
 
 from cloudbot import hook
 from cloudbot.event import EventType
 from . import destiny_manifest
+
 
 BASE_URL = 'https://www.bungie.net/Platform/'
 CLASS_TYPES = {0: 'Titan ', 1: 'Hunter ', 2: 'Warlock ', 3: ''}
@@ -192,3 +202,93 @@ def nightfall(text, bot):
                                                         ', '.join(challenges[:2])
                                                     )
     return output
+
+def get_chromedriver():
+    driver = glob.glob('chromedriver')
+    sys_plat = platform.system()
+
+    if sys_plat == 'Linux':
+        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_mac64.zip'
+    elif sys_plat == 'Darwin':
+        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_mac64.zip'
+    elif sys_plat == 'Windows':
+        target = 'https://chromedriver.storage.googleapis.com/2.33/chromedriver_win32.zip'
+    else:
+        raise Exception('Invalid platform')
+
+    if len(driver) == 1:
+        pass
+    elif len(driver) > 1:
+        raise Exception('Too many chromedrivers!')
+    else:
+        request = get(target)
+        zip_file = ZipFile(BytesIO(request.content))
+        zip_file.extractall()
+        zip_file.close()
+
+        # Permissions hackery
+        st = os.stat('chromedriver')
+        os.chmod('chromedriver', st.st_mode | 0o111)
+
+# TODO: Unfinished
+@hook.command('trials')
+def trials(text, bot):
+    if 'flush' in text.lower(): CACHE['trials'] = {}
+    if 'last' in text.lower():
+        try:
+            return CACHE['last_trials']['output']
+        except KeyError:
+            return 'Unavailable.'
+    if 'trials' in CACHE:
+        if 'expiration' in CACHE['trials']:
+            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['expiration']):
+                return CACHE['trials']['output']
+        if 'nextStart' in CACHE['trials']:
+            if datetime.datetime.utcnow() < string_to_datetime(CACHE['trials']['nextStart']):
+                time_to_trials = string_to_datetime(CACHE['trials']['nextStart']) - datetime.datetime.utcnow()
+                s = time_to_trials.seconds
+                h, s = divmod(s, 3600)
+                m, s = divmod(s, 60)
+                output = []
+                if time_to_trials.days > 0:
+                    output.append('{} days'.format(time_to_trials.days))
+                if h: output.append('{} hours'.format(h))
+                if m: output.append('{} minutes'.format(m))
+                if s: output.append('{} seconds'.format(s))
+                return '\x02Trials of Osiris will return in\x02 {}'.format(', '.join(output))
+
+    # Get ChromeDriver if not present
+    get_chromedriver()
+
+    # Initialize display and driver
+    display = Display(visible=0, size=(800, 600))
+    display.start()
+    browser = webdriver.Chrome("chromedriver")
+
+    # Get the page
+    url = "https://trials.report/"
+    browser.get(url) # navigate to the page
+    sleep(randint(2,3)) # sleep to make sure we get it
+    page = browser.execute_script("return document.body.innerHTML") # returns the inner HTML as a string
+
+    # Parse for info
+    soup = BeautifulSoup(page, 'html.parser')
+
+    # Get the location
+    loc = soup.find('h2', attrs={'class': 'card__title'}).text
+    trials_map = loc.strip()
+
+    # Shutdown display and driver
+    display.stop()
+    browser.quit()
+
+    new_trials= {
+        'expiration': advisors['status']['expirationDate'],
+        'nextStart': datetime_to_string(string_to_datetime(advisors['status']['startDate']) + datetime.timedelta(days=7)),
+        'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map)
+    }
+
+    if 'trials' in CACHE and new_trials != CACHE['trials']:
+        CACHE['last_trials'] = CACHE['trials']
+    CACHE['trials'] = new_trials
+    return new_trials['output']

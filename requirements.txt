@@ -18,3 +18,5 @@ pythonwhois
 imgurpython
 isodate
 python-dateutil
+pyvirtualdisplay
+selenium
