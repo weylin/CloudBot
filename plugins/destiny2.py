@@ -15,13 +15,13 @@ import urllib.parse
 from zipfile import ZipFile
 
 from bs4 import BeautifulSoup
-from pyvirtualdisplay import Display
+from feedparser import parse
 import requests
 from dateutil.relativedelta import relativedelta, FR
-from selenium import webdriver
 
 from cloudbot import hook
 from cloudbot.event import EventType
+from cloudbot.util.web import try_shorten
 from . import destiny_manifest
 
 
@@ -230,3 +230,17 @@ def trials(text, bot):
         trials_mode = trials_info['Response']['mode']
 
     return '\x02Trials of the Nine:\x02 {} on {}'.format(trials_mode, trials_map)
+
+@hook.command('rules')
+def rules(bot):
+    return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
+
+@hook.command('news')
+def news(bot):
+    feed = parse('https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1')
+    if not feed.entries:
+        return 'Feed not found.'
+
+    return '{} - {}'.format(
+        feed['entries'][0]['summary'],
+        try_shorten(feed['entries'][0]['link']))
