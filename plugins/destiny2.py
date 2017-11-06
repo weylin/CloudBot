@@ -65,7 +65,7 @@ def discord_tracker(event, db, conn):
 
 @hook.periodic(24 * 60 * 60, initial_interval=30)
 def check_manifest(bot):
-    api_key = bot.config.get('api_keys', {}).get('destiny', None)
+    api_key = HEADERS['X-API-Key']
     conn = bot.connections["DTG"]
     current = False
     try:
@@ -90,7 +90,7 @@ def check_manifest(bot):
         print("Destiny manifest is current!")
 
 @hook.command('item')
-def item_search(text, bot):
+def item_search(text):
     '''
     Expects the text to be a valid object in the Destiny database
     Returns the item's name and description.
@@ -121,7 +121,7 @@ def item_search(text, bot):
 
 # Name: Xûr, vendor hash: 2190858386, milestone hash: 534869653
 @hook.command('xur')
-def xur(text, bot):
+def xur():
     # reset happens at 9am UTC, so subtract that to simplify the math
     now = datetime.datetime.utcnow() - datetime.timedelta(hours=9)
 
@@ -174,7 +174,7 @@ def xur(text, bot):
     return output
 
 @hook.command('nightfall', 'nf')
-def nightfall(text, bot):
+def nightfall():
     milestones_url = '{}Destiny2/Milestones/'.format(BASE_URL)
     response = requests.get(milestones_url, headers=HEADERS).json()
 
@@ -207,7 +207,7 @@ def nightfall(text, bot):
 
 # Milestone hash: 3551755444
 @hook.command('trials')
-def trials(text, bot):
+def trials():
     trials_info = requests.get('https://api.trialsofthenine.com/week/0/').json()
 
     if not trials_info['Status'] == 'Success':
@@ -231,12 +231,48 @@ def trials(text, bot):
 
     return '\x02Trials of the Nine:\x02 {} on {}'.format(trials_mode, trials_map)
 
+@hook.command('weekly')
+def weekly():
+    result = requests.get('https://bungie.net/Platform/Destiny2/Milestones/', headers=HEADERS).json()
+
+    if result['ErrorCode'] != 1:
+        return "Error fetching weekly info :("
+
+    # Get raid challenge
+    raid_challenges = result['Response']['3660836525']['availableQuests'][0]['challenges']
+    raid_challenge = ""
+    for challenge in raid_challenges:
+        if challenge['activityHash'] != 3879860661:
+            if challenge['objectiveHash'] not in [1004127727, 1490146686]:
+                raid_challenge = MANIFEST['DestinyObjectiveDefinition'][challenge['objectiveHash']]['displayProperties']['name']
+
+    # Get flashpoint
+    flashpoint_info = result['Response']['463010297']['availableQuests'][0]['questItemHash']
+    flashpoint_location = MANIFEST['DestinyInventoryItemDefinition'][flashpoint_info]['displayProperties']['name']
+
+    # Get meditations info
+    meditations = result['Response']['3245985898']['availableQuests']
+
+    meditation_locations = []
+    for quest in meditations:
+        location_info = MANIFEST['DestinyActivityDefinition'][quest['questItemHash']]['displayProperties']['name'].split(':')
+
+        try:
+            location = location_info[1]
+        except IndexError:
+            location = location_info[0]
+
+        meditation_locations.append(location.replace('"', ''))
+
+
+    return "\x02Weekly activities:\x02 Leviathan Raid Challenge: {} || {} || Meditations: {}".format(raid_challenge, flashpoint_location, ",".join(meditation_locations))
+
 @hook.command('rules')
-def rules(bot):
+def rules():
     return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
 
 @hook.command('news')
-def news(bot):
+def news():
     feed = parse('https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1')
     if not feed.entries:
         return 'Feed not found.'

@@ -530,7 +530,7 @@ def daily(text,bot):
     CACHE['daily'] = new_daily
     return new_daily['output']
 
-@hook.command('weekly')
+@hook.command('d1weekly')
 def weekly(text,bot):
 
     if 'last' in text.lower():
