@@ -23,6 +23,20 @@ BASE_URL = 'https://www.bungie.net/Platform/'
 CLASS_TYPES = {0: 'Titan ', 1: 'Hunter ', 2: 'Warlock ', 3: ''}
 
 
+def pretty_time_delta(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    if days > 0:
+        return '{:d}d{:d}h{:d}m{:d}s'.format(days, hours, minutes, seconds)
+    elif hours > 0:
+        return '{:d}h{:d}m{:d}s'.format(hours, minutes, seconds)
+    elif minutes > 0:
+        return '{:d}m{:d}s'.format(minutes, seconds)
+    else:
+        return '{:d}s'.format(seconds)
+
 @hook.on_start()
 def load_cache(bot):
     '''Load in our pickle manifest and the Headers'''
@@ -309,6 +323,71 @@ def clan_weekly(text):
         return "\x02Clan weekly rewards:\x02 {}".format(" || ".join(output))
     else:
         return "\x02Clan weekly rewards:\x02 None have been earned you slackers!"
+
+@hook.command('wasted')
+def wasted(text):
+    platform = ''
+    display_name = ''
+
+    if text:
+        text = text.split(' ')
+        if len(text) != 2:
+            return 'Wrong number of args. Need display name and platform (psn, xbl, pc)'
+        display_name = text[0]
+        platform = text[1]
+        if platform in ['psn','ps','playstation','ps4']:
+            platform = 2
+        elif platform in ['xb1','xb','xbl','xbox']:
+            platform = 1
+        elif platform in ['pc', 'pcmr']:
+            if '#' not in display_name:
+                return 'Need ID number in Battle.net IDs'
+            platform = 4
+        else:
+            return 'Get a better platform.'
+    else:
+        return 'Wrong number of args. Need display name and platform (psn, xbl, pc)'
+
+    payload = {'membershipType': platform, 'displayName': display_name}
+    wasted_url = 'https://www.wastedondestiny.com/bungie/fetchAccounts'
+    response = requests.get(wasted_url, params=payload).json()
+
+    # Catch error
+    if response['code'] != 1:
+        return 'Error: {}'.format(response['message'])
+
+    try:
+        accounts = response['response']['destinyAccounts']
+    except KeyError:
+        return 'Error: Invalid player'
+
+    if accounts is None:
+        return 'Error: Invalid player'
+
+    # Get D2 results only
+    results = list(filter(lambda d: d['gameVersion'] in [2], accounts))
+
+    character_ids = []
+    for character in results:
+        character_ids.append((character['membershipType'], character['membershipId']))
+
+    time_played = 0
+    time_wasted = 0
+
+    for character_id in character_ids:
+        waste_query = "https://www.wastedondestiny.com/bungie/fetchCharacters?membershipType={}&membershipId={}&gameVersion=2".format(character_id[0], character_id[1])
+        waste = requests.get(waste_query).json()
+
+        characters = waste['response']
+        for character in characters:
+            time_played += character['timePlayed']
+            if character['deleted'] == True:
+                time_wasted += character['timeWasted']
+
+    totalTimePlayed = pretty_time_delta(time_played)
+    totalTimeWasted = pretty_time_delta(time_wasted)
+
+    return "Total: {} || Wasted: {}".format(totalTimePlayed, totalTimeWasted)
 
 @hook.command('rules')
 def rules():

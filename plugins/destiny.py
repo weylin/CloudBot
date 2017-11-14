@@ -1536,7 +1536,7 @@ def chars(text, nick, bot, notice):
         ))
     return "\x02{0}\x02: {1}".format(target['nick'], ' ; '.join(output))
 
-@hook.command('wasted')
+@hook.command('d1wasted')
 def wasted(text,nick,bot):
     if nick == 'DTG':
         nick = DISCORD_USER
