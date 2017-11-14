@@ -233,7 +233,7 @@ def trials():
 
 @hook.command('weekly')
 def weekly():
-    result = requests.get('https://bungie.net/Platform/Destiny2/Milestones/', headers=HEADERS).json()
+    result = requests.get('{}Destiny2/Milestones/'.format(BASE_URL), headers=HEADERS).json()
 
     if result['ErrorCode'] != 1:
         return "Error fetching weekly info :("
@@ -266,6 +266,55 @@ def weekly():
 
 
     return "\x02Weekly activities:\x02 Leviathan Raid Challenge: {} || {} || Meditations: {}".format(raid_challenge, flashpoint_location, ",".join(meditation_locations))
+
+@hook.command('clanweekly')
+def clan_weekly(text):
+    # Default to #DTG clan ID
+    if not text:
+        clan = 939927
+    else:
+        try:
+            clan = int(text)
+        except ValueError:
+            return "Error: Invalid clan ID"
+
+    # Get status of weekly clan engrams
+    clan_query = '{}Destiny2/Clan/{}/WeeklyRewardState/'.format(BASE_URL, clan)
+    response = requests.get(clan_query, headers=HEADERS).json()
+
+    # Catch error
+    if response['ErrorCode'] == 1:
+        clan_results = response['Response']['rewards'][0]['entries']
+    else:
+        return 'Error: {}'.format(response['Message'])
+
+    # Get the relevant data from the manifest
+    milestone_rewards_def = MANIFEST['DestinyMilestoneDefinition'][4253138191]['rewards']['1064137897']['rewardEntries']
+
+    # Build the output
+    output = []
+    earned_count = 0
+    for reward_entry in clan_results:
+        reward_hash = str(reward_entry['rewardEntryHash'])
+        reward = milestone_rewards_def[reward_hash]
+        reward_name = reward['displayProperties']['name']
+        reward_earned = reward_entry['earned']
+        if reward_entry['earned'] == True:
+            earned_count += 1
+
+        # Don't let avcables be lazy
+        if reward_name == "Trials of the Nine" and reward_earned == False:
+            result = "{} - Hey @avcables, go run Trials!".format(reward_name)
+        else:
+            result = "{} - Earned: {}".format(reward_name, reward_earned)
+        output.append(result)
+
+    if earned_count == 4:
+        return "\x02Clan weekly rewards:\x02 Completed! Let them burn in your light!"
+    elif 0 < earned_count < 4:
+        return "\x02Clan weekly rewards:\x02 {}".format(" || ".join(output))
+    else:
+        return "\x02Clan weekly rewards:\x02 None have been earned you slackers!"
 
 @hook.command('rules')
 def rules():
