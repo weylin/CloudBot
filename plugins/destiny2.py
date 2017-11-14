@@ -1,18 +1,12 @@
-from io import BytesIO
 import datetime
 import glob
 import json
 import os
 import pickle
-import platform
-from random import randint
-import stat
 import sys
-from time import sleep
 import traceback
 import urllib
 import urllib.parse
-from zipfile import ZipFile
 
 from bs4 import BeautifulSoup
 from feedparser import parse
