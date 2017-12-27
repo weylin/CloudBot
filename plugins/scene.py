@@ -27,16 +27,16 @@ from cloudbot.util import timeformat
 
 
 @hook.command("pre", "scene")
-def pre(text):
-    """pre <query> -- searches scene releases using pre.corrupt.org"""
+def pre(text, reply):
+    """<query> - searches scene releases using orlydb.com"""
 
     try:
         headers = {'Accept-Language': 'en-US'}
         request = requests.get("https://pre.corrupt-net.org/search.php", params={"search": text}, headers=headers)
         request.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        return 'Unable to fetch results: {}'.format(e)
-    split = request.text.partition('</tr><tr>')
+        reply('Unable to fetch results: {}'.format(e))
+        raise
 
     results = re.search("<tr><td id\=\"rlstype\".*>(.*)</td><td.*>&nbsp;&nbsp;(.*)<span id\=\"rlsgroup\"><font color\='#C0C0C0'>(.*)</font>.*>(\d*F).*>([\d\.]*M).*&nbsp;&nbsp;(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})</td>", split[0], flags=re.IGNORECASE)
     if results is None:

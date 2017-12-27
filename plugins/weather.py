@@ -1,12 +1,13 @@
 import requests
-
 from sqlalchemy import Table, Column, PrimaryKeyConstraint, String
+
 from cloudbot import hook
 from cloudbot.util import web, database
 
 
 class APIError(Exception):
     pass
+
 
 # Define database table
 
@@ -22,19 +23,19 @@ table = Table(
 google_base = 'https://maps.googleapis.com/maps/api/'
 geocode_api = google_base + 'geocode/json'
 
-api_sources = { 
+api_sources = {
     'darksky': 'https://api.darksky.net/forecast/{}/{}',
     'wunderground': 'http://api.wunderground.com/api/{}/forecast/geolookup/conditions/q/{}.json'
 }
 
 weather_base = api_sources[source]
- 
+
 # Wunderground specific:
 # Change this to a ccTLD code (eg. uk, nz) to make results more targeted towards that specific country.
 # <https://developers.google.com/maps/documentation/geocoding/#RegionCodes>
 bias = None
- 
- 
+
+
 def check_status(status):
     """
     A little helper function that checks an API error code and returns a nice message.
@@ -52,7 +53,7 @@ def check_status(status):
         return 'Invalid Request.'
     elif status == 'OK':
         return None
- 
+
 def to_c(ftemp):
     return (ftemp - 32) * (5/9)
 
@@ -65,14 +66,17 @@ def find_location(location):
     params = {"address": location, "key": dev_key}
     if bias:
         params['region'] = bias
- 
-    json = requests.get(geocode_api, params=params).json()
- 
+
+    request = requests.get(geocode_api, params=params)
+    request.raise_for_status()
+
+    json = request.json()
     error = check_status(json['status'])
     if error:
         raise APIError(error)
- 
+
     return json['results'][0]['geometry']['location']
+
 
 def load_cache(db):
     global location_cache
@@ -80,7 +84,8 @@ def load_cache(db):
     for row in db.execute(table.select()):
         nick = row["nick"]
         location = row["loc"]
-        location_cache.append((nick,location))
+        location_cache.append((nick, location))
+
 
 def add_location(nick, location, db):
     test = dict(location_cache)
@@ -93,6 +98,7 @@ def add_location(nick, location, db):
         db.execute(table.insert().values(nick=nick.lower(), loc=location.lower()))
         db.commit()
         load_cache(db)
+
 
 @hook.on_start
 def on_start(bot, db):
@@ -112,11 +118,18 @@ def get_location(nick):
         location = location[0]
     return location
 
+
 @hook.command("weather", "we", autohelp=False)
 def weather(text, reply, db, nick, notice):
+<<<<<<< HEAD
     """weather <location> -- Gets weather data for <location>."""
     if not weatherapi_key:
         return 'No API key found for {}'.format(source)
+=======
+    """<location> - Gets weather data for <location>."""
+    if not wunder_key:
+        return "This command requires a Weather Underground API key."
+>>>>>>> gonzobot/gonzobot
     if not dev_key:
         return "This command requires a Google Developers Console API key."
 
@@ -134,19 +147,21 @@ def weather(text, reply, db, nick, notice):
         location_data = find_location(location)
     except APIError as e:
         return e
- 
+
     formatted_location = "{lat},{lng}".format(**location_data)
- 
-    url = weather_base.format(weatherapi_key, formatted_location)
-    
-    response = requests.get(url).json()
- 
+
+    url = wunder_api.format(wunder_key, formatted_location)
+    request = requests.get(url)
+    request.raise_for_status()
+
+    response = request.json()
+
     if response['response'].get('error'):
         return "{}".format(response['response']['error']['description'])
- 
+
     #forecast_today = response["forecast"]["simpleforecast"]["forecastday"][0]
     #forecast_tomorrow = response["forecast"]["simpleforecast"]["forecastday"][1]
- 
+
     # put all the stuff we want to use in a dictionary for easy formatting of the output
     weather_data = {
         "place": response['current_observation']['display_location']['full'],
@@ -154,20 +169,12 @@ def weather(text, reply, db, nick, notice):
         "temp_f": response['current_observation']['temp_f'],
         "temp_c": response['current_observation']['temp_c']
     }
- 
+
     # Get the more accurate URL if available, if not, get the generic one.
     if "?query=," in response["current_observation"]['ob_url']:
-        try:
-            weather_data['url'] = web.try_shorten(response["current_observation"]['forecast_url'])
-        except:
-            weather_data['url'] = response["current_observation"]["forcast_url"]
-            pass
+        weather_data['url'] = web.try_shorten(response["current_observation"]['forecast_url'])
     else:
-        try:
-            weather_data['url'] = web.try_shorten(response["current_observation"]['ob_url'])
-        except:
-            weather_data['url'] = response["current_observation"]["ob_url"]
-            pass
+        weather_data['url'] = web.try_shorten(response["current_observation"]['ob_url'])
 
     reply("{place} - \x02Current:\x02 {conditions}, {temp_f}F/{temp_c}C, {humidity}, "
           "Wind: {wind_mph}MPH/{wind_kph}KPH {wind_direction}, \x02Today:\x02 {today_conditions}, "

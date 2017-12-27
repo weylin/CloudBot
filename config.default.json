@@ -17,6 +17,7 @@
                 "#dtgcoding",
 		        "#weylin"
             ],
+            "log_channel": "#MyAdminChannel",
             "disabled_commands": [],
             "acls": {},
             "sasl": {
