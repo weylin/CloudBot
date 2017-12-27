@@ -121,15 +121,9 @@ def get_location(nick):
 
 @hook.command("weather", "we", autohelp=False)
 def weather(text, reply, db, nick, notice):
-<<<<<<< HEAD
-    """weather <location> -- Gets weather data for <location>."""
-    if not weatherapi_key:
-        return 'No API key found for {}'.format(source)
-=======
     """<location> - Gets weather data for <location>."""
     if not wunder_key:
         return "This command requires a Weather Underground API key."
->>>>>>> gonzobot/gonzobot
     if not dev_key:
         return "This command requires a Google Developers Console API key."
 
