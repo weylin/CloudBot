@@ -1,13 +1,11 @@
 import asyncio
-import os
 import codecs
+import os
 import time
 
 import cloudbot
 from cloudbot import hook
 from cloudbot.event import EventType
-
-
 # +---------+
 # | Formats |
 # +---------+
@@ -26,7 +24,7 @@ irc_formats = {
     "MODE": "[{server}:{channel}] -!- mode/{channel} [{param_tail}] by {nick}",
     "TOPIC": "[{server}:{channel}] -!- {nick} has changed the topic to: {content}",
     "QUIT": "[{server}] -!- {nick} has quit ({content})",
-    "INVITE": "[{server}] -!- {nick} has invited {target} to {chan}",
+    "INVITE": "[{server}] -!- {nick} has invited {target} to {channel}",
     "NICK": "[{server}] {nick} is now known as {content}",
 }
 
@@ -95,13 +93,7 @@ def format_irc_event(event, args):
     # Try formatting with the CTCP command
 
     if event.irc_ctcp_text is not None:
-        ctcp_args = event.irc_ctcp_text.split(None, 1)
-
-        ctcp_command = ctcp_args[0]
-        ctcp_message = None
-        if len(ctcp_args) > 1:
-            ctcp_message = ctcp_args[1]
-
+        ctcp_command, _, ctcp_message = event.irc_ctcp_text.partition(' ')
         args["ctcp_command"] = ctcp_command
         args["ctcp_message"] = ctcp_message
 
@@ -125,7 +117,7 @@ def format_irc_event(event, args):
     if not logging_config.get("show_motd", True) and event.irc_command in ("375", "372", "376"):
         return None
     elif not logging_config.get("show_server_info", True) and event.irc_command in (
-            "003", "005", "250", "251", "252", "253", "254", "255", "256"):
+        "003", "005", "250", "251", "252", "253", "254", "255", "256"):
         return None
     elif event.irc_command == "PING":
         return None
@@ -133,6 +125,7 @@ def format_irc_event(event, args):
     # Format using the default raw format
 
     return irc_default.format(server=event.conn.name, irc_raw=event.irc_raw)
+
 
 # +--------------+
 # | File logging |
@@ -226,6 +219,10 @@ def log(event):
     """
     :type event: cloudbot.event.Event
     """
+    logging_config = event.bot.config.get("logging", {})
+    if not logging_config.get("file_log", False):
+        return
+
     text = format_event(event)
 
     if text is not None:
@@ -236,8 +233,8 @@ def log(event):
 
 
 # Log console separately to prevent lag
-@asyncio.coroutine
 @hook.irc_raw("*")
+@asyncio.coroutine
 def console_log(bot, event):
     """
     :type bot: cloudbot.bot.CloudBot
@@ -248,10 +245,20 @@ def console_log(bot, event):
         bot.logger.info(text)
 
 
-# TODO: @hook.onstop() for when unloaded
 @hook.command("flushlog", permissions=["botcontrol"])
 def flush_log():
     for name, stream in stream_cache.values():
         stream.flush()
     for name, stream in raw_cache.values():
         stream.flush()
+
+
+@hook.on_stop
+def close_logs():
+    for name, stream in stream_cache.values():
+        stream.flush()
+        stream.close()
+
+    for name, stream in raw_cache.values():
+        stream.flush()
+        stream.close()

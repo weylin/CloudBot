@@ -6,8 +6,7 @@ import requests
 
 from cloudbot import hook
 from cloudbot.util import timeformat
-from cloudbot.util.formatting import pluralize
-
+from cloudbot.util.formatting import pluralize_auto
 
 youtube_re = re.compile(r'(?:youtube.*?(?:v=|/v/)|youtu\.be/|yooouuutuuube.*?id=)([-_a-zA-Z0-9]+)', re.I)
 
@@ -20,7 +19,8 @@ err_no_api = "The YouTube API is off in the Google Developers Console."
 
 
 def get_video_description(video_id):
-    json = requests.get(api_url.format(video_id, dev_key)).json()
+    request = requests.get(api_url.format(video_id, dev_key))
+    json = request.json()
 
     if json.get('error'):
         if json['error']['code'] == 403:
@@ -40,14 +40,17 @@ def get_video_description(video_id):
 
     length = isodate.parse_duration(content_details['duration'])
     out += ' - length \x02{}\x02'.format(timeformat.format_time(int(length.total_seconds()), simple=True))
-    total_votes = float(statistics.get('likeCount', 0)) + float(statistics.get('dislikeCount', 0))
+    try:
+        total_votes = float(statistics['likeCount']) + float(statistics['dislikeCount'])
+    except (LookupError, ValueError):
+        total_votes = 0
 
     if total_votes != 0:
         # format
-        likes = pluralize(int(statistics.get('likeCount', 0)), "like")
-        dislikes = pluralize(int(statistics.get('dislikeCount', 0)), "dislike")
+        likes = pluralize_auto(int(statistics['likeCount']), "like")
+        dislikes = pluralize_auto(int(statistics['dislikeCount']), "dislike")
 
-        percent = 100 * float(statistics.get('likeCount', 0)) / total_votes
+        percent = 100 * float(statistics['likeCount']) / total_votes
         out += ' - {}, {} (\x02{:.1f}\x02%)'.format(likes,
                                                     dislikes, percent)
 
@@ -79,10 +82,17 @@ def youtube_url(match):
 
 
 @hook.command("youtube", "you", "yt", "y")
-def youtube(text):
-    """youtube <query> -- Returns the first YouTube search result for <query>."""
+def youtube(text, reply):
+    """<query> - Returns the first YouTube search result for <query>."""
     if not dev_key:
         return "This command requires a Google Developers Console API key."
+
+    try:
+        request = requests.get(search_api_url, params={"q": text, "key": dev_key, "type": "video"})
+        request.raise_for_status()
+    except Exception:
+        reply("Error performing search.")
+        raise
 
     json = requests.get(search_api_url, params={"q": text, "key": dev_key, "type": "video"}).json()
 
@@ -101,10 +111,17 @@ def youtube(text):
 
 
 @hook.command("youtime", "ytime")
-def youtime(text):
-    """youtime <query> -- Gets the total run time of the first YouTube search result for <query>."""
+def youtime(text, reply):
+    """<query> - Gets the total run time of the first YouTube search result for <query>."""
     if not dev_key:
         return "This command requires a Google Developers Console API key."
+
+    try:
+        request = requests.get(search_api_url, params={"q": text, "key": dev_key, "type": "video"})
+        request.raise_for_status()
+    except Exception:
+        reply("Error performing search.")
+        raise
 
     json = requests.get(search_api_url, params={"q": text, "key": dev_key, "type": "video"}).json()
 
@@ -118,7 +135,11 @@ def youtime(text):
         return 'No results found.'
 
     video_id = json['items'][0]['id']['videoId']
-    json = requests.get(api_url.format(video_id, dev_key)).json()
+
+    request = requests.get(api_url.format(video_id, dev_key))
+    request.raise_for_status()
+
+    json = request.json()
 
     if json.get('error'):
         return
@@ -147,9 +168,16 @@ ytpl_re = re.compile(r'(.*:)//(www.youtube.com/playlist|youtube.com/playlist)(:[
 
 
 @hook.regex(ytpl_re)
-def ytplaylist_url(match):
+def ytplaylist_url(match, reply):
     location = match.group(4).split("=")[-1]
-    json = requests.get(playlist_api_url, params={"id": location, "key": dev_key}).json()
+    try:
+        request = requests.get(playlist_api_url, params={"id": location, "key": dev_key})
+        request.raise_for_status()
+    except Exception:
+        reply("Error looking up playlist.")
+        raise
+
+    json = request.json()
 
     if json.get('error'):
         if json['error']['code'] == 403:

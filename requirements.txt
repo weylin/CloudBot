@@ -1,6 +1,8 @@
 nltk
 geoip2
 git+https://github.com/CloudBotIRC/mcstatus.git@master
+cleverwrap
+future
 microdata
 sqlalchemy
 watchdog
@@ -15,5 +17,4 @@ pyenchant
 pythonwhois
 imgurpython
 isodate
-cfscrape
-fuzzywuzzy
+yarl

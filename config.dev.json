@@ -47,7 +47,7 @@
                   "op"
                ],
                "users":[
-                  "vagrant!~vagrant@localhost"
+                  "~mcd@localhost"
                ]
             }
          },
@@ -72,7 +72,7 @@
    },
    "database":"sqlite:///cloudbot.db",
    "plugin_loading":{
-      "use_whitelist":true,
+      "use_whitelist":false,
       "blacklist":[
          "destiny_lfg",
          "destiny_rpg",
@@ -82,14 +82,17 @@
          "destiny",
          "admin_bot",
          "admin_channel",
-         "core_ctcp",
-         "core_misc",
-         "core_sieve",
-         "core_tracker",
+         "core.core_connect",
+         "core.core_ctcp",
+         "core.core_hooks",
+         "core.core_misc",
+         "core.core_out",
+         "core.core_sieve",
+         "core.core_tracker",
+         "core.help",
          "ignore",
          "history",
-         "time_plugin",
-         "help"
+         "time_plugin"
       ]
    },
    "web":{
@@ -108,6 +111,7 @@
       "show_plugin_loading":true,
       "show_motd":true,
       "show_server_info":true,
-      "raw_file_log":false
+      "raw_file_log":false,
+      "file_log":true
    }
 }
