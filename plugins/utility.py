@@ -14,19 +14,18 @@ License: GPL v3
 """
 
 import base64
-import hashlib
-import collections
-import re
-import os
-import json
-import codecs
-import urllib.parse
-import random
 import binascii
+import codecs
+import collections
+import hashlib
+import json
+import os
+import random
+import re
+import urllib.parse
 
 from cloudbot import hook
 from cloudbot.util import formatting, web, colors
-
 
 COLORS = collections.OrderedDict([
     ('red', '\x0304'),
@@ -44,7 +43,7 @@ COLORS = collections.OrderedDict([
 
 # helper functions
 
-strip_re = re.compile("(\x03|\x02|\x1f|\x0f)(?:,?\d{1,2}(?:,\d{1,2})?)?")
+strip_re = re.compile("[\u0003\u0002\u001F\u000F](?:,?\d{1,2}(?:,\d{1,2})?)?")
 
 
 def strip(string):
@@ -122,6 +121,16 @@ def swapcase(text):
     return text.swapcase()
 
 
+@hook.command("aesthetic", "vapor", "fw")
+def fullwidth(text):
+    """<string> -- Converts <string> to full width characters."""
+    HALFWIDTH_TO_FULLWIDTH = str.maketrans(
+        '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&()*+,-./:;<=>?@[]^_`{|}~',
+        '０１２３４５６７８９ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ！゛＃＄％＆（）＊＋、ー。／：；〈＝〉？＠［］＾＿‘｛｜｝～'
+    )
+    return text.translate(HALFWIDTH_TO_FULLWIDTH)
+
+
 # encoding
 
 @hook.command("rot13")
@@ -141,7 +150,7 @@ def base64_encode(text):
 def base64_decode(text, notice):
     """<string> -- Decode <string> with base64."""
     try:
-        return base64.b64decode(text.encode()).decode()
+        return " ".join(base64.b64decode(text.encode()).decode().splitlines())
     except binascii.Error:
         notice("Invalid base64 string '{}'".format(text))
 
@@ -161,14 +170,14 @@ def base64_check(text):
 def unescape(text):
     """<string> -- Unicode unescapes <string>."""
     decoder = codecs.getdecoder("unicode_escape")
-    return decoder(text)[0]
+    return " ".join(decoder(text)[0].splitlines())
 
 
 @hook.command
 def escape(text):
     """<string> -- Unicode escapes <string>."""
     encoder = codecs.getencoder("unicode_escape")
-    return encoder(text)[0].decode()
+    return " ".join(encoder(text)[0].decode().splitlines())
 
 
 # length
