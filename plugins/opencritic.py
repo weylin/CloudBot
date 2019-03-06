@@ -16,6 +16,8 @@ headers = {
 def oc(text):
     searchUrl = url + 'search'
     scoreUrl = url + 'score'
+    dateUrl = url + 'filter'
+    games = []
 
     searchQuery = {
         'criteria': text
@@ -35,17 +37,20 @@ def oc(text):
                 str(gameId) + '/' + \
                 re.sub('[^0-9a-zA-Z]+', '-', item['name']).lower()
 
+    games.append(gameId)
+
     scoreQuery = {
         'id': gameId
     }
+    scoreResponse = requests.request("GET", scoreUrl, headers=headers, params=scoreQuery).json()
 
-    response = requests.request(
-        "GET", scoreUrl, headers=headers, params=scoreQuery).json()
+    dateQuery = '{"ids": ' + str(games) + ', "orderBy": "timeAscending"}'
+    gameDate = requests.post(dateUrl, headers=headers, data=dateQuery).json()[0]['releaseDate'][:10]
 
     try:
-        gameScore = round(float(response['score']))
+        gameScore = round(float(scoreResponse['score']))
     except:
-        return '\x02{}\x02 does not have an average score yet.'.format(gameTitle)
+        return '\x02{}\x02 releases on {}.'.format(gameTitle, gameDate)
     else:
         return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(gameTitle, gameScore, gameUrl)
 
