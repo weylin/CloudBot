@@ -11,6 +11,31 @@ headers = {
     'content-type': "application/json",
     'cache-control': "no-cache"
 }
+platformList = {
+    ('switch', 'nintendo', 'nintendo switch'): '32',
+    ('sony', 'playstation', 'playstation 4', 'ps4', 'psn'): '6',
+    ('microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl'): '7',
+    ('windows', 'pc'): '27',
+    ('3ds', 'nintendo 3ds'): '36',
+    ('vive', 'htc', 'htc vive'): '30',
+    ('rift', 'oculus', 'oculus rift'): '29',
+    ('vr', 'hmd'): '29,30',
+    ('vita', 'ps vita', 'psp'): '33'
+}
+
+
+def platformCategory(text):
+    platformId = ''
+
+    for platform, id in platformList.items():
+        if text.lower() in platform:
+            platformId = id
+
+    if len(platformId) == 0:
+        platformId += '6,7,27,29,30,32,33,36'
+
+    return platformId
+
 
 @hook.command('oc')
 def oc(text):
@@ -42,10 +67,12 @@ def oc(text):
     scoreQuery = {
         'id': gameId
     }
-    scoreResponse = requests.request("GET", scoreUrl, headers=headers, params=scoreQuery).json()
+    scoreResponse = requests.request(
+        "GET", scoreUrl, headers=headers, params=scoreQuery).json()
 
     dateQuery = '{"ids": ' + str(games) + ', "orderBy": "timeAscending"}'
-    gameDate = requests.post(dateUrl, headers=headers, data=dateQuery).json()[0]['releaseDate'][:10]
+    gameDate = requests.post(dateUrl, headers=headers, data=dateQuery).json()[
+        0]['releaseDate'][:10]
 
     try:
         gameScore = round(float(scoreResponse['score']))
@@ -54,34 +81,15 @@ def oc(text):
     else:
         return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(gameTitle, gameScore, gameUrl)
 
+
 @hook.command('octop')
 def octop(text):
     searchUrl = url + 'filter'
     output = []
     startDate = datetime.datetime.now().year
 
-    if len(text) == 0:
-        platformCategory = '6,7,27,29,30,32,33,36'
-    elif text.lower() in {'switch', 'nintendo', 'nintendo switch'}:
-        platformCategory = '32'
-    elif text.lower() in {'sony', 'playstation', 'playstation 4', 'ps4', 'psn'}:
-        platformCategory = '6'
-    elif text.lower() in {'microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl'}:
-        platformCategory = '7'
-    elif text.lower() in {'windows', 'pc'}:
-        platformCategory = '27'
-    elif text.lower() in {'3ds'}:
-        platformCategory = '36'
-    elif text.lower() in {'vive', 'htc', 'htc vive'}:
-        platformCategory = '30'
-    elif text.lower() in {'rift', 'oculus', 'oculus rift'}:
-        platformCategory = '29'
-    elif text.lower() in {'vr'}:
-        platformCategory = '29,30'
-    elif text.lower() in {'vita', 'ps vita', 'psp'}:
-        platformCategory = '33'
-
-    data = '{"Platforms": [' + platformCategory + '], "orderBy": "score", "limit": 5, "includeOnlyBase": true, "startDate": "' + str(startDate) + '-1-1", "endDate": "' + str(startDate) + '-12-31", "minTime": true}'
+    data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "score", "limit": 5, "includeOnlyBase": true, "startDate": "' + str(
+        startDate) + '-1-1", "endDate": "' + str(startDate) + '-12-31", "minTime": true}'
 
     response = requests.post(searchUrl, headers=headers, data=data)
 
@@ -91,34 +99,15 @@ def octop(text):
 
     return ', '.join(output)
 
+
 @hook.command('ocup')
 def ocup(text):
     searchUrl = url + 'filter'
     output = []
     startDate = datetime.datetime.now().strftime("%Y-%-m-%-d")
 
-    if len(text) == 0:
-        platformCategory = '6,7,27,29,30,32,33,36'
-    elif text.lower() in {'switch', 'nintendo', 'nintendo switch'}:
-        platformCategory = '32'
-    elif text.lower() in {'sony', 'playstation', 'playstation 4', 'ps4', 'psn'}:
-        platformCategory = '6'
-    elif text.lower() in {'microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl'}:
-        platformCategory = '7'
-    elif text.lower() in {'windows', 'pc'}:
-        platformCategory = '27'
-    elif text.lower() in {'3ds'}:
-        platformCategory = '36'
-    elif text.lower() in {'vive', 'htc', 'htc vive'}:
-        platformCategory = '30'
-    elif text.lower() in {'rift', 'oculus', 'oculus rift'}:
-        platformCategory = '29'
-    elif text.lower() in {'vr'}:
-        platformCategory = '29,30'
-    elif text.lower() in {'vita', 'ps vita', 'psp'}:
-        platformCategory = '33'
-
-    data = '{"Platforms": [' + platformCategory + '], "orderBy": "timeAscending", "limit": 5, "includeOnlyBase": true, "startDate": "' + str(startDate) + '", "minTime": true}'
+    data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "timeAscending", "limit": 5, "includeOnlyBase": true, "startDate": "' + \
+        str(startDate) + '", "minTime": true}'
 
     response = requests.post(searchUrl, headers=headers, data=data)
 
@@ -129,3 +118,4 @@ def ocup(text):
             i['name'], i['releaseDate'][:10]))
 
     return ', '.join(output)
+
