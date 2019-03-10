@@ -5,7 +5,7 @@ from cloudbot.util import web
 from cloudbot.util.web import try_shorten
  
 # Settings
-source = 'wunderground' # 'darksky' or 'wunderground'
+source = 'darksky' # 'darksky' or 'wunderground'
 
 class APIError(Exception):
     pass
