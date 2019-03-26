@@ -1,9 +1,10 @@
 import asyncio
-import random
 import functools
+import random
+import re
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 
 from cloudbot import hook
 
@@ -19,8 +20,8 @@ def refresh_fml_cache(loop):
     request = yield from loop.run_in_executor(None, _func)
     soup = BeautifulSoup(request.text)
 
-    for e in soup.find_all('div', {'class': 'post article'}):
-        fml_id = int(e['id'])
+    for e in soup.find_all('article', {'class': 'art-panel'}):
+        fml_id = int(e.find('div', {'id': re.compile('card')})['id'].split('-')[-1])
         text = ''.join(e.find('p').find_all(text=True))
         fml_cache.append((fml_id, text))
 
@@ -40,37 +41,45 @@ def refresh_mlia_cache(loop):
         mlia_cache.append((mlia_id, mlia_text))
 
 
-@asyncio.coroutine
 @hook.on_start()
+@asyncio.coroutine
 def initial_refresh(loop):
     # do an initial refresh of the caches
     yield from refresh_fml_cache(loop)
     yield from refresh_mlia_cache(loop)
 
 
-@asyncio.coroutine
 @hook.command(autohelp=False)
+@asyncio.coroutine
 def fml(reply, loop):
-    """- gets a random quote from fmyfife.com"""
+    """- gets a random quote from fmylife.com"""
 
-    # grab the last item in the fml cache and remove it
-    fml_id, text = fml_cache.pop()
-    # reply with the fml we grabbed
-    reply('(#{}) {}'.format(fml_id, text))
+    if fml_cache:
+        # grab the last item in the fml cache and remove it
+        fml_id, text = fml_cache.pop()
+        # reply with the fml we grabbed
+        reply('(#{}) {}'.format(fml_id, text))
+    else:
+        yield from refresh_fml_cache(loop)
+
     # refresh fml cache if its getting empty
     if len(fml_cache) < 3:
         yield from refresh_fml_cache(loop)
 
 
-@asyncio.coroutine
 @hook.command(autohelp=False)
+@asyncio.coroutine
 def mlia(reply, loop):
     """- gets a random quote from MyLifeIsAverage.com"""
 
-    # grab the last item in the mlia cache and remove it
-    mlia_id, text = mlia_cache.pop()
-    # reply with the mlia we grabbed
-    reply('({}) {}'.format(mlia_id, text))
+    if mlia_cache:
+        # grab the last item in the mlia cache and remove it
+        mlia_id, text = mlia_cache.pop()
+        # reply with the mlia we grabbed
+        reply('({}) {}'.format(mlia_id, text))
+    else:
+        yield from refresh_mlia_cache(loop)
+
     # refresh mlia cache if its getting empty
     if len(mlia_cache) < 3:
         yield from refresh_mlia_cache(loop)

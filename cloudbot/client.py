@@ -1,10 +1,22 @@
 import asyncio
-import logging
 import collections
+import logging
+import random
 
 from cloudbot.permissions import PermissionManager
 
 logger = logging.getLogger("cloudbot")
+
+CLIENTS = {}
+
+
+def client(_type):
+    def _decorate(cls):
+        CLIENTS[_type] = cls
+        cls._type = _type
+        return cls
+
+    return lambda cls: _decorate(cls)
 
 
 class Client:
@@ -20,6 +32,8 @@ class Client:
     :type history: dict[str, list[tuple]]
     :type permissions: PermissionManager
     """
+
+    _type = None
 
     def __init__(self, bot, name, nick, *, channels=None, config=None):
         """
@@ -55,11 +69,33 @@ class Client:
         # set when on_load in core_misc is done
         self.ready = False
 
+        self._active = False
+
     def describe_server(self):
         raise NotImplementedError
 
     @asyncio.coroutine
-    def connect(self):
+    def auto_reconnect(self):
+        if not self._active:
+            return
+
+        yield from self.try_connect()
+
+    @asyncio.coroutine
+    def try_connect(self):
+        timeout = 30
+        while not self.connected:
+            try:
+                yield from self.connect(timeout)
+            except Exception:
+                logger.exception("[%s] Error occurred while connecting.", self.name)
+            else:
+                break
+
+            yield from asyncio.sleep(random.randrange(timeout))
+
+    @asyncio.coroutine
+    def connect(self, timeout=None):
         """
         Connects to the server, or reconnects if already connected.
         """
@@ -82,6 +118,14 @@ class Client:
         Sends a message to the given target
         :type target: str
         :type text: str
+        """
+        raise NotImplementedError
+
+    def admin_log(self, text, console=True):
+        """
+        Log a message to the configured admin channel
+        :type text: str
+        :type console: bool
         """
         raise NotImplementedError
 
@@ -122,6 +166,22 @@ class Client:
         """
         raise NotImplementedError
 
+    def is_nick_valid(self, nick):
+        """
+        Determines if a nick is valid for this connection
+        :param nick: The nick to check
+        :return: True if it is valid, otherwise false
+        """
+        raise NotImplementedError
+
     @property
     def connected(self):
         raise NotImplementedError
+
+    @property
+    def type(self):
+        return self._type
+
+    @property
+    def active(self):
+        return self._active

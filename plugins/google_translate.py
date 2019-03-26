@@ -2,7 +2,6 @@ import requests
 
 from cloudbot import hook
 
-
 max_length = 100
 
 
@@ -49,7 +48,7 @@ def match_language(fragment):
     return None
 
 
-@hook.command()
+@hook.command("google_translate")
 def translate(text, bot):
     """[source language [target language]] <sentence> - translates <sentence> from source language (default autodetect)
      to target language (default English) using Google Translate"""

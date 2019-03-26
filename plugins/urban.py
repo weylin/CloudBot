@@ -5,15 +5,14 @@ import requests
 from cloudbot import hook
 from cloudbot.util import formatting
 
-
 base_url = 'http://api.urbandictionary.com/v0'
 define_url = base_url + "/define"
 random_url = base_url + "/random"
 
 
 @hook.command("urban", "u", autohelp=False)
-def urban(text):
-    """urban <phrase> [id] -- Looks up <phrase> on urbandictionary.com."""
+def urban(text, reply):
+    """<phrase> [id] - Looks up <phrase> on urbandictionary.com."""
 
     headers = {
         "Referer": "http://m.urbandictionary.com"
@@ -39,7 +38,8 @@ def urban(text):
             request = requests.get(define_url, params=params, headers=headers)
             request.raise_for_status()
         except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
-            return "Could not get definition: {}".format(e)
+            reply("Could not get definition: {}".format(e))
+            raise
 
         page = request.json()
 
@@ -51,7 +51,8 @@ def urban(text):
             request = requests.get(random_url, headers=headers)
             request.raise_for_status()
         except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
-            return "Could not get definition: {}".format(e)
+            reply("Could not get definition: {}".format(e))
+            raise
 
         page = request.json()
         id_num = None
