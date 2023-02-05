@@ -102,6 +102,7 @@ class CloudBot:
         self.memory = collections.defaultdict()
 
         # declare and create data folder
+        self.data_path = self.base_dir / "data"
         self.data_dir = os.path.abspath('data')
         if not os.path.exists(self.data_dir):
             logger.debug("Data folder not found, creating.")
@@ -156,7 +157,14 @@ class CloudBot:
 
         self.plugin_manager = PluginManager(self)
 
-    def run(self):
+    @property
+    def data_dir(self) -> str:
+        warnings.warn(
+            "data_dir has been replaced by data_path", DeprecationWarning
+        )
+        return str(self.data_path)
+
+    async def run(self):
         """
         Starts CloudBot.
         This will load plugins, connect to IRC, and process input.
@@ -164,11 +172,13 @@ class CloudBot:
         :rtype: bool
         """
         # Initializes the bot, plugins and connections
-        self.loop.run_until_complete(self._init_routine())
+        await self._init_routine()
         # Wait till the bot stops. The stopped_future will be set to True to restart, False otherwise
-        restart = self.loop.run_until_complete(self.stopped_future)
-        self.loop.run_until_complete(self.plugin_manager.unload_all())
-        self.loop.close()
+        logger.debug("Init done")
+        restart = await self.stopped_future
+        logger.debug("Waiting for plugin unload")
+        await self.plugin_manager.unload_all()
+        logger.debug("Unload complete")
         return restart
 
     def create_connections(self):

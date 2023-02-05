@@ -1,32 +1,23 @@
+import asyncio
 import logging
 import os
 import signal
 import sys
 import time
-
 from pathlib import Path
 
-# store the original working directory, for use when restarting
-original_wd = Path().resolve()
-
-# set up environment - we need to make sure we are in the install directory
-path0 = Path(sys.path[0] or '.').resolve()
-install_dir = Path(__file__).resolve().parent
-if path0 == install_dir:
-    sys.path[0] = path0 = install_dir.parent
-
-os.chdir(str(install_dir.parent))
-
-# import bot
 from cloudbot.bot import CloudBot
 from cloudbot.util import async_util
 
 
-def main():
+async def async_main():
+    # store the original working directory, for use when restarting
+    original_wd = Path().resolve()
+
     # Logging optimizations, doing it here because we only want to change this if we're the main file
     logging._srcfile = None
-    logging.logThreads = 0
-    logging.logProcesses = 0
+    logging.logThreads = False
+    logging.logProcesses = False
 
     logger = logging.getLogger("cloudbot")
     logger.info("Starting CloudBot.")
@@ -50,19 +41,22 @@ def main():
             # we are currently in the process of restarting
             stopped_while_restarting = True
         else:
-            async_util.run_coroutine_threadsafe(_bot.stop("Killed (Received SIGINT {})".format(signum)), _bot.loop)
+            async_util.run_coroutine_threadsafe(
+                _bot.stop("Killed (Received SIGINT {})".format(signum)),
+                _bot.loop,
+            )
 
-        logger.warning("Bot received Signal Interrupt ({})".format(signum))
+        logger.warning("Bot received Signal Interrupt (%s)", signum)
 
         # restore the original handler so if they do it again it triggers
         signal.signal(signal.SIGINT, original_sigint)
 
     signal.signal(signal.SIGINT, exit_gracefully)
 
-    # start the bot master
+    # start the bot
 
     # CloudBot.run() will return True if it should restart, False otherwise
-    restart = _bot.run()
+    restart = await _bot.run()
 
     # the bot has stopped, do we want to restart?
     if restart:
@@ -77,17 +71,23 @@ def main():
             os.chdir(str(original_wd))
             args = sys.argv
             logger.info("Restarting Bot")
-            logger.debug("Restart arguments: {}".format(args))
+            logger.debug("Restart arguments: %s", args)
             for f in [sys.stdout, sys.stderr]:
                 f.flush()
+
             # close logging, and exit the program.
             logger.debug("Stopping logging engine")
             logging.shutdown()
-            os.execv(sys.executable, [sys.executable] + args)
+            os.execv(sys.executable, [sys.executable] + args)  # nosec
 
     # close logging, and exit the program.
     logger.debug("Stopping logging engine")
     logging.shutdown()
 
 
-main()
+def main():
+    asyncio.run(async_main())
+
+
+if __name__ == "__main__":
+    main()
