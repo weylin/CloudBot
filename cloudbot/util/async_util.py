@@ -3,7 +3,9 @@ Wraps various asyncio functions
 """
 
 import asyncio
-import sys
+from asyncio import AbstractEventLoop
+from asyncio.tasks import Task
+
 from functools import partial
 
 from cloudbot.util.func_utils import call_with_args
@@ -56,17 +58,9 @@ def run_coroutine_threadsafe(coro, loop):
     if not asyncio.iscoroutine(coro):
         raise TypeError('A coroutine object is required')
 
-    if sys.version_info < (3, 5, 1):
-        loop.call_soon_threadsafe(partial(wrap_future, coro, loop=loop))
-    else:
-        asyncio.run_coroutine_threadsafe(coro, loop)
+    asyncio.run_coroutine_threadsafe(coro, loop)
 
 
-def create_future(loop=None):
-    if loop is None:
-        loop = asyncio.get_event_loop()
-
-    if sys.version_info < (3, 5, 2):
-        return asyncio.Future(loop=loop)
+def create_future(loop) -> asyncio.Future:
 
     return loop.create_future()
