@@ -1,4 +1,5 @@
 name: Deploy CloudBotIRC to Bots EC2 Instance.
+
 on:
   push:
     branches:
@@ -19,12 +20,12 @@ jobs:
         run: |
           mkdir -p $HOME/.ssh/
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519_${{ secrets.SSH_USER }}
-          chmod 600 $GITHUB_WORKSPACE/.ssh/id_ed25519_${{ secrets.SSH_USER }}
+          chmod 600 $HOME/.ssh/id_ed25519_${{ secrets.SSH_USER }}
 
       - name: Add EC2 instance to known hosts
         run: |
-          ssh-keyscan -t ed25519 ${{ secrets.SSH_HOST }} >> $GITHUB_WORKSPACE/.ssh/known_hosts
+          ssh-keyscan -t ed25519 ${{ secrets.SSH_HOST }} >> $HOME/.ssh/known_hosts
 
       - name: Sync files to EC2 using rsync
         run: |
-          rsync -avz --delete --exclude='.git' $GITHUB_WORKSPACE/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}
+          rsync -avz --delete --exclude='.git' $HOME/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}
