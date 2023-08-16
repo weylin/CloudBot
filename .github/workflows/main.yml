@@ -17,12 +17,9 @@ jobs:
 
       - name: Start SSH Agent and Add Key
         run: |
-          eval "$(ssh-agent -s)"
-          ls -al $GITHUB_WORKSPACE/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $GITHUB_WORKSPACE/.ssh/id_ed25519_${{ secrets.SSH_USER }}
+          mkdir -p $HOME/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $HOME/.ssh/id_ed25519_${{ secrets.SSH_USER }}
           chmod 600 $GITHUB_WORKSPACE/.ssh/id_ed25519_${{ secrets.SSH_USER }}
-          ssh-add $GITHUB_WORKSPACE/.ssh/id_ed25519_${{ secrets.SSH_USER }}
-          rm $GITHUB_WORKSPACE/.ssh/id_ed25519_${{ secrets.SSH_USER }}
 
       - name: Add EC2 instance to known hosts
         run: |
