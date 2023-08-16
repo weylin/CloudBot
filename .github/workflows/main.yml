@@ -28,4 +28,4 @@ jobs:
 
       - name: Sync files to EC2 using rsync
         run: |
-          rsync -avz --delete --exclude='.git' $HOME/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}
+          rsync -avz --delete --exclude='.git' -e "ssh -i $HOME/.ssh/id_ed25519_${{ secrets.SSH_USER }}" $GITHUB_WORKSPACE/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}/CloudBot
