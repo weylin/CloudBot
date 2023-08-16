@@ -1,0 +1,33 @@
+name: Deploy CloudBotIRC to Bots EC2 Instance.
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install OpenSSH and rsync
+        run: |
+          sudo apt-get install -y openssh-client rsync
+
+      - name: Start SSH Agent and Add Key
+        run: |
+          eval "$(ssh-agent -s)"
+          ls -al $GITHUB_WORKSPACE/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $GITHUB_WORKSPACE/.ssh/${{ secrets.SSH_USER }}
+          chmod 600 $GITHUB_WORKSPACE/.ssh/${{ secrets.SSH_USER }}
+          ssh-add $GITHUB_WORKSPACE/.ssh/${{ secrets.SSH_USER }}
+          rm $GITHUB_WORKSPACE/.ssh/${{ secrets.SSH_USER }}
+
+      - name: Add EC2 instance to known hosts
+        run: |
+          ssh-keyscan -t ed25519 ${{ secrets.SSH_HOST }} >> $GITHUB_WORKSPACE/.ssh/known_hosts
+
+      - name: Sync files to EC2 using rsync
+        run: |
+          rsync -avz --delete --exclude='.git' $GITHUB_WORKSPACE/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.WORK_DIR }}
