@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 
 from cloudbot.bot import CloudBot
-from cloudbot.util import async_util
 
 
 async def async_main():
@@ -41,8 +40,9 @@ async def async_main():
             # we are currently in the process of restarting
             stopped_while_restarting = True
         else:
-            async_util.run_coroutine_threadsafe(
-                _bot.stop("Killed (Received SIGINT {})".format(signum)),
+            asyncio.run_coroutine_threadsafe(
+                _bot.stop(f"Killed (Received SIGINT {signum})"),
+
                 _bot.loop,
             )
 

@@ -9,8 +9,9 @@ from ssl import SSLContext
 
 from cloudbot.client import Client, client
 from cloudbot.event import Event, EventType, IrcOutEvent
-from cloudbot.util import async_util
+from cloudbot.util import colors
 from cloudbot.util.parsers.irc import Message
+
 
 logger = logging.getLogger("cloudbot")
 
@@ -261,7 +262,9 @@ class IrcClient(Client):
         :type line: str
         :type log: bool
         """
-        async_util.wrap_future(self._protocol.send(line, log=log), loop=self.loop)
+        asyncio.ensure_future(
+            self._protocol.send(line, log=log), loop=self.loop
+        )
 
     @property
     def connected(self):
@@ -301,7 +304,7 @@ class _IrcProtocol(asyncio.Protocol):
         self._transport = None
 
         # Future that waits until we are connected
-        self._connected_future = async_util.create_future(self.loop)
+        self._connected_future = self.loop.create_future()
 
     def connection_made(self, transport):
         self._transport = transport
@@ -316,7 +319,7 @@ class _IrcProtocol(asyncio.Protocol):
         if exc:
             logger.error("[{}] Connection lost: {}".format(self.conn.name, exc))
 
-        async_util.wrap_future(self.conn.auto_reconnect(), loop=self.loop)
+        asyncio.ensure_future(self.conn.auto_reconnect(), loop=self.loop)
 
     def close(self):
         self._connecting = False
@@ -411,6 +414,7 @@ class _IrcProtocol(asyncio.Protocol):
                 content_raw = None
                 content = None
 
+
             # Event type
             if command in irc_command_to_event_type:
                 event_type = irc_command_to_event_type[command]
@@ -476,7 +480,7 @@ class _IrcProtocol(asyncio.Protocol):
             )
 
             # handle the message, async
-            async_util.wrap_future(self.bot.process(event), loop=self.loop)
+            asyncio.ensure_future(self.bot.process(event), loop=self.loop)
 
     @property
     def connected(self):

@@ -20,8 +20,9 @@ from cloudbot.config import Config
 from cloudbot.event import Event, CommandEvent, RegexEvent, EventType
 from cloudbot.hook import Action
 from cloudbot.plugin import PluginManager
-from cloudbot.reloader import PluginReloader, ConfigReloader
-from cloudbot.util import database, formatting, async_util
+from cloudbot.reloader import ConfigReloader, PluginReloader
+from cloudbot.util import CLIENT_ATTR, database, formatting, async_util
+from cloudbot.util.mapping import KeyFoldDict
 
 try:
     from cloudbot.web.main import WebInterface
@@ -30,6 +31,7 @@ try:
 except ImportError:
     WebInterface = None
     web_installed = False
+
 
 logger = logging.getLogger("cloudbot")
 
@@ -90,7 +92,7 @@ class CloudBot:
         self.start_time = time.time()
         self.running = True
         # future which will be called when the bot stopsIf you
-        self.stopped_future = async_util.create_future(self.loop)
+        self.stopped_future = self.loop.create_future()
 
         # stores each bot server connection
         self.connections = {}
