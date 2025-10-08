@@ -20,14 +20,14 @@ import nltk
 
 from cloudbot import hook
 
-pronunciations = None
+pronunciations: dict[str, list[list[str]]] = {}
 
 
 # Translate functions by J.F. Sebastian
 # <https://stackoverflow.com/questions/22773826/pig-latin-translator>
 
-def translate(word):
-    global pronunciations
+
+def translate(word: str):
     word = word.lower()  # NOTE: ignore Unicode casefold
     i = 0
     # find out whether the word start with a vowel sound using
@@ -39,11 +39,15 @@ def translate(word):
                 break
         else:  # no vowels
             assert 0
+
         if i == 0:  # starts with a vowel
             return word + "way"
-        elif "y" in word:  # allow 'y' as a vowel for known words
+
+        if "y" in word:  # allow 'y' as a vowel for known words
             return translate_basic(word, vowels="aeiouy", start=i)
+
         break  # use only the first pronunciation
+
     return translate_basic(word, start=i)
 
 
@@ -60,16 +64,15 @@ def translate_basic(word, vowels="aeiou", start=0):
 
 @hook.on_start()
 def load_nltk():
-    nltk.download('cmudict')
+    nltk.download("cmudict")
 
-    global pronunciations
-    pronunciations = nltk.corpus.cmudict.dict()
+    pronunciations.clear()
+    pronunciations.update(nltk.corpus.cmudict.dict())
 
 
 @hook.command("pig", "piglatin")
 def piglatin(text):
     """<text> - Converts <text> to pig latin."""
-    global pronunciations
     if not pronunciations:
         return "Please wait, getting NLTK ready!"
 
@@ -94,5 +97,5 @@ def piglatin(text):
 
     if text.isupper():
         return " ".join(words).upper()
-    else:
-        return " ".join(words)
+
+    return " ".join(words)

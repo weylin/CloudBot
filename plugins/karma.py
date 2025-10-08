@@ -3,29 +3,42 @@ import re
 from collections import defaultdict
 
 import sqlalchemy
-from sqlalchemy import Table, String, Column, Integer, PrimaryKeyConstraint, select, and_
+from sqlalchemy import (
+    Column,
+    Integer,
+    PrimaryKeyConstraint,
+    String,
+    Table,
+    and_,
+    select,
+)
+from sqlalchemy.sql.base import Executable
 
 from cloudbot import hook
 from cloudbot.util import database
 
-karmaplus_re = re.compile('^.*\+\+$')
-karmaminus_re = re.compile('^.*--$')
+karmaplus_re = re.compile(r"^.*\+\+$")
+karmaminus_re = re.compile("^.*--$")
 
 karma_table = Table(
-    'karma',
+    "karma",
     database.metadata,
-    Column('name', String),
-    Column('chan', String),
-    Column('thing', String),
-    Column('score', Integer),
-    PrimaryKeyConstraint('name', 'chan', 'thing')
+    Column("name", String),
+    Column("chan", String),
+    Column("thing", String),
+    Column("score", Integer),
+    PrimaryKeyConstraint("name", "chan", "thing"),
 )
 
 
-@hook.on_start
+@hook.on_start()
 def remove_non_channel_points(db):
     """Temporary on_start hook to remove non-channel points"""
-    db.execute(karma_table.delete().where(sqlalchemy.not_(karma_table.c.chan.startswith('#'))))
+    db.execute(
+        karma_table.delete().where(
+            sqlalchemy.not_(karma_table.c.chan.startswith("#"))
+        )
+    )
     db.commit()
 
 
@@ -35,13 +48,20 @@ def update_score(nick, chan, thing, score, db):
         return
 
     thing = thing.strip()
-    clause = and_(karma_table.c.name == nick, karma_table.c.chan == chan, karma_table.c.thing == thing.lower())
-    karma = db.execute(select([karma_table.c.score]).where(clause)).fetchone()
+    clause = and_(
+        karma_table.c.name == nick,
+        karma_table.c.chan == chan,
+        karma_table.c.thing == thing.lower(),
+    )
+    karma = db.execute(select(karma_table.c.score).where(clause)).fetchone()
+    query: Executable
     if karma:
-        score += int(karma[0])
+        score += karma.score
         query = karma_table.update().values(score=score).where(clause)
     else:
-        query = karma_table.insert().values(name=nick, chan=chan, thing=thing.lower(), score=score)
+        query = karma_table.insert().values(
+            name=nick, chan=chan, thing=thing.lower(), score=score
+        )
 
     db.execute(query)
     db.commit()
@@ -56,11 +76,13 @@ def addpoint(text, nick, chan, db):
 @hook.regex(karmaplus_re)
 def re_addpt(match, nick, chan, db, notice):
     """no useful help txt"""
-    thing = match.group().split('++')[0]
+    thing = match.group().split("++")[0]
     if thing:
         addpoint(thing, nick, chan, db)
     else:
-        notice(pluspts(nick, chan, db))
+        out = pluspts(nick, chan, db)
+        if out:
+            notice(out)
 
 
 @hook.command("mm", "rmpoint")
@@ -73,12 +95,21 @@ def rmpoint(text, nick, chan, db):
 def pluspts(nick, chan, db):
     """- prints the things you have liked and their scores"""
     output = ""
-    clause = and_(karma_table.c.name == nick, karma_table.c.chan == chan, karma_table.c.score >= 0)
-    query = select([karma_table.c.thing, karma_table.c.score]).where(clause).order_by(karma_table.c.score.desc())
+    clause = and_(
+        karma_table.c.name == nick,
+        karma_table.c.chan == chan,
+        karma_table.c.score >= 0,
+    )
+    query = (
+        select(karma_table.c.thing, karma_table.c.score)
+        .where(clause)
+        .order_by(karma_table.c.score.desc())
+    )
+
     likes = db.execute(query).fetchall()
 
     for like in likes:
-        output += "{} has {} points ".format(like[0], like[1])
+        output += f"{like[0]} has {like[1]} points "
 
     return output
 
@@ -87,12 +118,20 @@ def pluspts(nick, chan, db):
 def minuspts(nick, chan, db):
     """- prints the things you have disliked and their scores"""
     output = ""
-    clause = and_(karma_table.c.name == nick, karma_table.c.chan == chan, karma_table.c.score <= 0)
-    query = select([karma_table.c.thing, karma_table.c.score]).where(clause).order_by(karma_table.c.score)
+    clause = and_(
+        karma_table.c.name == nick,
+        karma_table.c.chan == chan,
+        karma_table.c.score <= 0,
+    )
+    query = (
+        select(karma_table.c.thing, karma_table.c.score)
+        .where(clause)
+        .order_by(karma_table.c.score)
+    )
     likes = db.execute(query).fetchall()
 
     for like in likes:
-        output += "{} has {} points ".format(like[0], like[1])
+        output += f"{like[0]} has {like[1]} points "
 
     return output
 
@@ -100,25 +139,32 @@ def minuspts(nick, chan, db):
 @hook.regex(karmaminus_re)
 def re_rmpt(match, nick, chan, db, notice):
     """no useful help txt"""
-    thing = match.group().split('--')[0]
+    thing = match.group().split("--")[0]
     if thing:
         rmpoint(thing, nick, chan, db)
     else:
-        notice(minuspts(nick, chan, db))
+        out = minuspts(nick, chan, db)
+        if out:
+            notice(out)
 
 
-@hook.command("points", autohelp=False)
-def points(text, chan, db):
+@hook.command("points")
+def points_cmd(text, chan, db):
     """<thing> - will print the total points for <thing> in the channel."""
     score = 0
     thing = ""
     if text.endswith(("-global", " global")):
         thing = text[:-7].strip()
-        query = select([karma_table.c.score]).where(karma_table.c.thing == thing.lower())
+        query = select(karma_table.c.score).where(
+            karma_table.c.thing == thing.lower()
+        )
     else:
         text = text.strip()
-        query = select([karma_table.c.score]).where(karma_table.c.thing == text.lower()).where(
-            karma_table.c.chan == chan)
+        query = (
+            select(karma_table.c.score)
+            .where(karma_table.c.thing == text.lower())
+            .where(karma_table.c.chan == chan)
+        )
 
     karma = db.execute(query).fetchall()
     if karma:
@@ -131,67 +177,61 @@ def points(text, chan, db):
                 pos += int(k[0])
             score += int(k[0])
         if thing:
-            return "{} has a total score of {} (+{}/{}) across all channels I know about.".format(thing, score, pos,
-                                                                                                  neg)
-        return "{} has a total score of {} (+{}/{}) in {}.".format(text, score, pos, neg, chan)
+            return "{} has a total score of {} (+{}/{}) across all channels I know about.".format(
+                thing, score, pos, neg
+            )
+        return "{} has a total score of {} (+{}/{}) in {}.".format(
+            text, score, pos, neg, chan
+        )
+
+    return f"I couldn't find {text} in the database."
+
+
+def parse_lookup(text, db, chan, name):
+    if text in ("global", "-global"):
+        items = db.execute(
+            select(karma_table.c.thing, karma_table.c.score)
+        ).fetchall()
+        out = f"The {{}} most {name} things in all channels are: "
     else:
-        return "I couldn't find {} in the database.".format(text)
+        items = db.execute(
+            select(karma_table.c.thing, karma_table.c.score).where(
+                karma_table.c.chan == chan
+            )
+        ).fetchall()
+        out = f"The {{}} most {name} things in {{}} are: "
+
+    return out, items
+
+
+def do_list(text, db, chan, loved=True):
+    counts: dict[str, int] = defaultdict(int)
+    out, items = parse_lookup(text, db, chan, "loved" if loved else "hated")
+    if not items:
+        return None
+
+    for item in items:
+        thing = item[0]
+        score = int(item[1])
+        counts[thing] += score
+
+    scores = counts.items()
+    sorts = sorted(scores, key=operator.itemgetter(1), reverse=loved)[:10]
+    out = out.format(len(sorts), chan) + " \u2022 ".join(
+        f"{thing[0]} with {thing[1]} points" for thing in sorts
+    )
+    return out
 
 
 @hook.command("topten", "pointstop", "loved", autohelp=False)
 def pointstop(text, chan, db):
-    """- prints the top 10 things with the highest points in the channel. To see the top 10 items in all of the channels the bot sits in use .topten global."""
-    points = defaultdict(int)
-    if text == "global" or text == "-global":
-        items = db.execute(select([karma_table.c.thing, karma_table.c.score])).fetchall()
-        out = "The top {} favorite things in all channels are: "
-    else:
-        items = db.execute(
-            select([karma_table.c.thing, karma_table.c.score]).where(karma_table.c.chan == chan)
-        ).fetchall()
-        out = "The top {} favorite things in {} are: "
-
-    if items:
-        for item in items:
-            thing = item[0]
-            score = int(item[1])
-            points[thing] += score
-        scores = points.items()
-        sorts = sorted(scores, key=operator.itemgetter(1), reverse=True)
-        ten = str(len(sorts))
-        if int(ten) > 10:
-            ten = "10"
-        out = out.format(ten, chan)
-        for i in range(0, int(ten)):
-            out += "{} with {} points \u2022 ".format(sorts[i][0], sorts[i][1])
-        out = out[:-2]
-        return out
+    """- prints the top 10 things with the highest points in the channel. To see the top 10 items in all of the
+    channels the bot sits in use .topten global."""
+    return do_list(text, db, chan)
 
 
 @hook.command("bottomten", "pointsbottom", "hated", autohelp=False)
 def pointsbottom(text, chan, db):
-    """- prints the top 10 things with the lowest points in the channel. To see the bottom 10 items in all of the channels the bot sits in use .bottomten global."""
-    points = defaultdict(int)
-    if text == "global" or text == "-global":
-        items = db.execute(select([karma_table.c.thing, karma_table.c.score])).fetchall()
-        out = "The {} most hated things in all channels are: "
-    else:
-        items = db.execute(
-            select([karma_table.c.thing, karma_table.c.score]).where(karma_table.c.chan == chan)
-        ).fetchall()
-        out = "The {} most hated things in {} are: "
-    if items:
-        for item in items:
-            thing = item[0]
-            score = int(item[1])
-            points[thing] += score
-        scores = points.items()
-        sorts = sorted(scores, key=operator.itemgetter(1))
-        ten = str(len(sorts))
-        if int(ten) > 10:
-            ten = "10"
-        out = out.format(ten, chan)
-        for i in range(0, int(ten)):
-            out += "{} with {} points \u2022 ".format(sorts[i][0], sorts[i][1])
-        out = out[:-2]
-        return out
+    """- prints the top 10 things with the lowest points in the channel. To see the bottom 10 items in all of the
+    channels the bot sits in use .bottomten global."""
+    return do_list(text, db, chan, False)

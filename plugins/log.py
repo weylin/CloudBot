@@ -1,16 +1,19 @@
-import asyncio
-import codecs
+import logging
 import os
+import os.path
 import time
+from typing import TextIO
 
 import cloudbot
 from cloudbot import hook
 from cloudbot.event import EventType
+from cloudbot.util.formatting import strip_colors
+
+logger = logging.getLogger("cloudbot")
+
 # +---------+
 # | Formats |
 # +---------+
-from cloudbot.util.formatting import strip_colors
-
 base_formats = {
     EventType.message: "[{server}:{channel}] <{nick}> {content}",
     EventType.notice: "[{server}:{channel}] -{nick}- {content}",
@@ -31,29 +34,48 @@ irc_formats = {
 irc_default = "[{server}] {irc_raw}"
 
 ctcp_known = "[{server}:{channel}] {nick} [{user}@{host}] has requested CTCP {ctcp_command}"
-ctcp_known_with_message = ("[{server}:{channel}] {nick} [{user}@{host}] "
-                           "has requested CTCP {ctcp_command}: {ctcp_message}")
+ctcp_known_with_message = (
+    "[{server}:{channel}] {nick} [{user}@{host}] "
+    "has requested CTCP {ctcp_command}: {ctcp_message}"
+)
 ctcp_unknown = "[{server}:{channel}] {nick} [{user}@{host}] has requested unknown CTCP {ctcp_command}"
-ctcp_unknown_with_message = ("[{server}:{channel}] {nick} [{user}@{host}] "
-                             "has requested unknown CTCP {ctcp_command}: {ctcp_message}")
+ctcp_unknown_with_message = (
+    "[{server}:{channel}] {nick} [{user}@{host}] "
+    "has requested unknown CTCP {ctcp_command}: {ctcp_message}"
+)
+
+server_info_numerics = (
+    "003",
+    "005",
+    "250",
+    "251",
+    "252",
+    "253",
+    "254",
+    "255",
+    "256",
+)
 
 
 # +------------+
 # | Formatting |
 # +------------+
 
+
 def format_event(event):
     """
     Format an event
-    :type event: cloudbot.event.Event
-    :rtype: str
     """
 
     # Setup arguments
 
     args = {
-        "server": event.conn.name, "target": event.target, "channel": event.chan, "nick": event.nick,
-        "user": event.user, "host": event.host
+        "server": event.conn.name,
+        "target": event.target,
+        "channel": event.chan,
+        "nick": event.nick,
+        "user": event.user,
+        "host": event.host,
     }
 
     if event.content is not None:
@@ -70,6 +92,8 @@ def format_event(event):
     # Try formatting with IRC-formats, if this is an IRC event
     if event.irc_command is not None:
         return format_irc_event(event, args)
+
+    return None
 
 
 def format_irc_event(event, args):
@@ -93,20 +117,20 @@ def format_irc_event(event, args):
     # Try formatting with the CTCP command
 
     if event.irc_ctcp_text is not None:
-        ctcp_command, _, ctcp_message = event.irc_ctcp_text.partition(' ')
+        ctcp_command, _, ctcp_message = event.irc_ctcp_text.partition(" ")
         args["ctcp_command"] = ctcp_command
         args["ctcp_message"] = ctcp_message
 
         if ctcp_command in ("VERSION", "PING", "TIME", "FINGER"):
             if ctcp_message:
                 return ctcp_known_with_message.format(**args)
-            else:
-                return ctcp_known.format(**args)
-        else:
-            if ctcp_message:
-                return ctcp_unknown_with_message.format(**args)
-            else:
-                return ctcp_unknown.format(**args)
+
+            return ctcp_known.format(**args)
+
+        if ctcp_message:
+            return ctcp_unknown_with_message.format(**args)
+
+        return ctcp_unknown.format(**args)
 
     # No formats have been found, resort to the default
 
@@ -114,12 +138,20 @@ def format_irc_event(event, args):
 
     logging_config = event.bot.config.get("logging", {})
 
-    if not logging_config.get("show_motd", True) and event.irc_command in ("375", "372", "376"):
+    if not logging_config.get("show_motd", True) and event.irc_command in (
+        "375",
+        "372",
+        "376",
+    ):
         return None
-    elif not logging_config.get("show_server_info", True) and event.irc_command in (
-        "003", "005", "250", "251", "252", "253", "254", "255", "256"):
+
+    if (
+        not logging_config.get("show_server_info", True)
+        and event.irc_command in server_info_numerics
+    ):
         return None
-    elif event.irc_command == "PING":
+
+    if event.irc_command == "PING":
         return None
 
     # Format using the default raw format
@@ -137,16 +169,18 @@ raw_file_format = "{server}_%Y%m%d.log"
 folder_format = "%Y"
 
 # Stream cache, (server, chan) -> (file_name, stream)
-stream_cache = {}
+stream_cache: dict[tuple[str, str], tuple[str, TextIO]] = {}
 # Raw stream cache, server -> (file_name, stream)
-raw_cache = {}
+raw_cache: dict[str, tuple[str, TextIO]] = {}
 
 
 def get_log_filename(server, chan):
     current_time = time.gmtime()
     folder_name = time.strftime(folder_format, current_time)
-    file_name = time.strftime(file_format.format(chan=chan, server=server), current_time).lower()
-    return os.path.join(cloudbot.logging_dir, folder_name, file_name)
+    file_name = time.strftime(
+        file_format.format(chan=chan, server=server), current_time
+    ).lower()
+    return cloudbot.logging_info.add_path(folder_name, file_name)
 
 
 def get_log_stream(server, chan):
@@ -167,7 +201,7 @@ def get_log_stream(server, chan):
         # a dumb hack to bypass the fact windows does not allow * in file names
         new_filename = new_filename.replace("*", "server")
 
-        log_stream = codecs.open(new_filename, mode="a", encoding="utf-8", buffering=1)
+        log_stream = open(new_filename, mode="a", encoding="utf-8", buffering=1)
         stream_cache[cache_key] = (new_filename, log_stream)
 
     return log_stream
@@ -176,13 +210,15 @@ def get_log_stream(server, chan):
 def get_raw_log_filename(server):
     current_time = time.gmtime()
     folder_name = time.strftime(folder_format, current_time)
-    file_name = time.strftime(raw_file_format.format(server=server), current_time).lower()
-    return os.path.join(cloudbot.logging_dir, "raw", folder_name, file_name)
+    file_name = time.strftime(
+        raw_file_format.format(server=server), current_time
+    ).lower()
+    return cloudbot.logging_info.add_path("raw", folder_name, file_name)
 
 
 def get_raw_log_stream(server):
     new_filename = get_raw_log_filename(server)
-    old_filename, log_stream = stream_cache.get(server, (None, None))
+    old_filename, log_stream = raw_cache.get(server, (None, None))
 
     # If the filename has changed since we opened the stream, we should re-open
     if new_filename != old_filename:
@@ -193,18 +229,14 @@ def get_raw_log_stream(server):
 
         logging_dir = os.path.dirname(new_filename)
         os.makedirs(logging_dir, exist_ok=True)
-
-        log_stream = codecs.open(new_filename, mode="a", encoding="utf-8", buffering=1)
-        stream_cache[server] = (new_filename, log_stream)
+        log_stream = open(new_filename, mode="a", encoding="utf-8", buffering=1)
+        raw_cache[server] = (new_filename, log_stream)
 
     return log_stream
 
 
 @hook.irc_raw("*", singlethread=True)
 def log_raw(event):
-    """
-    :type event: cloudbot.event.Event
-    """
     logging_config = event.bot.config.get("logging", {})
     if not logging_config.get("raw_file_log", False):
         return
@@ -216,9 +248,6 @@ def log_raw(event):
 
 @hook.irc_raw("*", singlethread=True)
 def log(event):
-    """
-    :type event: cloudbot.event.Event
-    """
     logging_config = event.bot.config.get("logging", {})
     if not logging_config.get("file_log", False):
         return
@@ -226,7 +255,11 @@ def log(event):
     text = format_event(event)
 
     if text is not None:
-        if event.irc_command in ["PRIVMSG", "PART", "JOIN", "MODE", "TOPIC", "QUIT", "NOTICE"] and event.chan:
+        if (
+            event.irc_command
+            in ["PRIVMSG", "PART", "JOIN", "MODE", "TOPIC", "QUIT", "NOTICE"]
+            and event.chan
+        ):
             stream = get_log_stream(event.conn.name, event.chan)
             stream.write(text + os.linesep)
             stream.flush()
@@ -234,31 +267,27 @@ def log(event):
 
 # Log console separately to prevent lag
 @hook.irc_raw("*")
-@asyncio.coroutine
-def console_log(bot, event):
-    """
-    :type bot: cloudbot.bot.CloudBot
-    :type event: cloudbot.event.Event
-    """
+async def console_log(bot, event):
     text = format_event(event)
     if text is not None:
-        bot.logger.info(text)
+        logger.info(text)
 
 
 @hook.command("flushlog", permissions=["botcontrol"])
 def flush_log():
-    for name, stream in stream_cache.values():
+    """- Flush all log streams"""
+    for _, stream in stream_cache.values():
         stream.flush()
-    for name, stream in raw_cache.values():
+    for _, stream in raw_cache.values():
         stream.flush()
 
 
-@hook.on_stop
+@hook.on_stop()
 def close_logs():
-    for name, stream in stream_cache.values():
+    for _, stream in stream_cache.values():
         stream.flush()
         stream.close()
 
-    for name, stream in raw_cache.values():
+    for _, stream in raw_cache.values():
         stream.flush()
         stream.close()

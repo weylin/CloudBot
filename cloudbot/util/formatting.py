@@ -44,8 +44,8 @@ License for final section (all code after the "DJANGO LICENCE" comment):
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+
 import copy
-import html.entities
 import re
 import warnings
 from html.parser import HTMLParser
@@ -57,62 +57,63 @@ from cloudbot.util.colors import strip_irc
 IRC_COLOR_RE = re.compile(r"(\x03(\d+,\d+|\d)|[\x0f\x02\x16\x1f])")
 
 REPLACEMENTS = {
-    'a': 'ä',
-    'b': 'Б',
-    'c': 'ċ',
-    'd': 'đ',
-    'e': 'ë',
-    'f': 'ƒ',
-    'g': 'ġ',
-    'h': 'ħ',
-    'i': 'í',
-    'j': 'ĵ',
-    'k': 'ķ',
-    'l': 'ĺ',
-    'm': 'ṁ',
-    'n': 'ñ',
-    'o': 'ö',
-    'p': 'ρ',
-    'q': 'ʠ',
-    'r': 'ŗ',
-    's': 'š',
-    't': 'ţ',
-    'u': 'ü',
-    'v': '',
-    'w': 'ω',
-    'x': 'χ',
-    'y': 'ÿ',
-    'z': 'ź',
-    'A': 'Å',
-    'B': 'Β',
-    'C': 'Ç',
-    'D': 'Ď',
-    'E': 'Ē',
-    'F': 'Ḟ',
-    'G': 'Ġ',
-    'H': 'Ħ',
-    'I': 'Í',
-    'J': 'Ĵ',
-    'K': 'Ķ',
-    'L': 'Ĺ',
-    'M': 'Μ',
-    'N': 'Ν',
-    'O': 'Ö',
-    'P': 'Р',
-    'Q': 'Ｑ',
-    'R': 'Ŗ',
-    'S': 'Š',
-    'T': 'Ţ',
-    'U': 'Ů',
-    'V': 'Ṿ',
-    'W': 'Ŵ',
-    'X': 'Χ',
-    'Y': 'Ỳ',
-    'Z': 'Ż'
+    "a": "ä",
+    "b": "Б",
+    "c": "ċ",
+    "d": "đ",
+    "e": "ë",
+    "f": "ƒ",
+    "g": "ġ",
+    "h": "ħ",
+    "i": "í",
+    "j": "ĵ",
+    "k": "ķ",
+    "l": "ĺ",
+    "m": "ṁ",
+    "n": "ñ",
+    "o": "ö",
+    "p": "ρ",
+    "q": "ʠ",
+    "r": "ŗ",
+    "s": "š",
+    "t": "ţ",
+    "u": "ü",
+    "v": "",
+    "w": "ω",
+    "x": "χ",
+    "y": "ÿ",
+    "z": "ź",
+    "A": "Å",
+    "B": "Β",
+    "C": "Ç",
+    "D": "Ď",
+    "E": "Ē",
+    "F": "Ḟ",
+    "G": "Ġ",
+    "H": "Ħ",
+    "I": "Í",
+    "J": "Ĵ",
+    "K": "Ķ",
+    "L": "Ĺ",
+    "M": "Μ",
+    "N": "Ν",
+    "O": "Ö",
+    "P": "Р",
+    "Q": "Ｑ",
+    "R": "Ŗ",
+    "S": "Š",
+    "T": "Ţ",
+    "U": "Ů",
+    "V": "Ṿ",
+    "W": "Ŵ",
+    "X": "Χ",
+    "Y": "Ỳ",
+    "Z": "Ż",
 }
 
 
 # Classes
+
 
 class HTMLTextExtractor(HTMLParser):
     """
@@ -126,24 +127,16 @@ class HTMLTextExtractor(HTMLParser):
     def handle_data(self, d):
         self.result.append(d)
 
-    def handle_charref(self, number):
-        codepoint = int(number[1:], 16) if number[0] in ('x', 'X') else int(number)
-        self.result.append(chr(codepoint))
-
-    def handle_entityref(self, name):
-        codepoint = html.entities.name2codepoint[name]
-        self.result.append(chr(codepoint))
-
     def get_text(self):
-        return ''.join(self.result)
+        return "".join(self.result)
 
 
 # Functions
 
+
 def strip_html(to_strip):
     """
     Takes HTML and returns cleaned and stripped text.
-    :rtype str
     """
     s = HTMLTextExtractor()
     s.feed(to_strip)
@@ -154,13 +147,12 @@ def munge(text, count=0):
     """
     Replaces characters in a string with visually similar characters to avoid pinging users in IRC.
     Count sets how many characters are replaced, defaulting to all characters.
-    :rtype str
     """
     reps = 0
-    for n in range(len(text)):
-        rep = REPLACEMENTS.get(text[n])
+    for n, c in enumerate(text):
+        rep = REPLACEMENTS.get(c)
         if rep:
-            text = text[:n] + rep + text[n + 1:]
+            text = text[:n] + rep + text[n + 1 :]
             reps += 1
             if reps == count:
                 break
@@ -177,17 +169,16 @@ def ireplace(text, old, new, count=None):
 
     if count:
         return pattern.sub(new, text, count=count)
-    else:
-        return pattern.sub(new, text)
+
+    return pattern.sub(new, text)
 
 
 def multi_replace(text, word_dic):
     """
     Takes a string and replace words that match a key in a dictionary with the associated value,
     then returns the changed text
-    :rtype str
     """
-    rc = re.compile('|'.join(map(re.escape, word_dic)))
+    rc = re.compile("|".join(map(re.escape, word_dic)))
 
     def translate(match):
         return word_dic[match.group(0)]
@@ -199,28 +190,26 @@ def multi_replace(text, word_dic):
 multiword_replace = multi_replace
 
 
-def truncate_words(content, length=10, suffix='...'):
+def truncate_words(content, length=10, suffix="..."):
     """
     Truncates a string after a certain number of words.
-    :rtype str
     """
     split = content.split()
     if len(split) <= length:
         return " ".join(split[:length])
-    else:
-        return " ".join(split[:length]) + suffix
+
+    return " ".join(split[:length]) + suffix
 
 
-def truncate(content, length=100, suffix='...'):
+def truncate(content, length=100, suffix="...", sep=" "):
     """
     Truncates a string after a certain number of characters.
     Function always tries to truncate on a word boundary.
-    :rtype str
     """
     if len(content) <= length:
         return content
-    else:
-        return content[:length].rsplit(' ', 1)[0] + suffix
+
+    return content[:length].rsplit(sep, 1)[0] + suffix
 
 
 # compatibility
@@ -231,46 +220,42 @@ strip_colors = strip_irc
 def chunk_str(content, length=420):
     """
     Chunks a string into smaller strings of given length. Returns chunks.
-    :rtype list
     """
 
     def chunk(c, l):
         while c:
-            out = (c + ' ')[:l].rsplit(' ', 1)[0]
-            c = c[len(out):].strip()
+            out = (c + " ")[:l].rsplit(" ", 1)[0]
+            c = c[len(out) :].strip()
             yield out
 
     return list(chunk(content, length))
 
 
-def pluralize(num=0, text=''):
+def pluralize(num=0, text=""):  # pragma: no cover
     """
     Takes a number and a string, and pluralizes that string using the number and combines the results.
-    :rtype: str
     """
     warnings.warn(
         "formatting.pluralize() is deprecated, please use one of the other formatting.pluralize_*() functions",
-        DeprecationWarning
+        DeprecationWarning,
     )
     return pluralize_suffix(num, text)
 
 
-def pluralise(num=0, text=''):
+def pluralise(num=0, text=""):  # pragma: no cover
     """
     Takes a number and a string, and pluralizes that string using the number and combines the results.
-    :rtype: str
     """
     warnings.warn(
         "formatting.pluralise() is deprecated, please use one of the other formatting.pluralise_*() functions",
-        DeprecationWarning
+        DeprecationWarning,
     )
     return pluralise_suffix(num, text)
 
 
-def pluralize_suffix(num=0, text='', suffix='s'):
+def pluralize_suffix(num=0, text="", suffix="s"):
     """
     Takes a number and a string, and pluralizes that string using the number and combines the results.
-    :rtype: str
     """
     return pluralize_select(num, text, text + suffix)
 
@@ -279,105 +264,116 @@ pluralise_suffix = pluralize_suffix
 
 
 def pluralize_select(count, single, plural):
-    return "{:,} {}".format(count, single if count == 1 else plural)
+    return f"{count:,} {single if count == 1 else plural}"
 
 
 pluralise_select = pluralize_select
 
 
 def pluralize_auto(count, thing):
-    if thing.endswith(('s', 'ss', 'sh', 'ch', 'x', 'z')):
-        return pluralize_suffix(count, thing, 'es')
-    elif thing.endswith(('f', 'fe')):
-        return pluralize_select(count, thing, thing.rsplit('f', 1)[0] + 'ves')
-    elif thing.endswith('y') and thing[-2:-1].lower() not in "aeiou":
-        return pluralize_select(count, thing, thing[:-1] + 'ies')
-    elif thing.endswith('y') and thing[-2:-1].lower() in "aeiou":
+    if thing.endswith("us"):
+        return pluralize_select(count, thing, thing[:-2] + "i")
+
+    if thing.endswith("is"):
+        return pluralize_select(count, thing, thing[:-2] + "es")
+
+    if thing.endswith(("s", "ss", "sh", "ch", "x", "z")):
+        return pluralize_suffix(count, thing, "es")
+
+    if thing.endswith(("f", "fe")):
+        return pluralize_select(count, thing, thing.rsplit("f", 1)[0] + "ves")
+
+    if thing.endswith("y") and thing[-2:-1].lower() not in "aeiou":
+        return pluralize_select(count, thing, thing[:-1] + "ies")
+
+    if thing.endswith("y") and thing[-2:-1].lower() in "aeiou":
         return pluralize_suffix(count, thing)
-    elif thing.endswith('o'):
-        return pluralize_suffix(count, thing, 'es')
-    elif thing.endswith('us'):
-        return pluralize_select(count, thing, thing[:-2] + 'i')
-    elif thing.endswith('is'):
-        return pluralize_select(count, thing, thing[:-2] + 'es')
-    elif thing.endswith('on'):
-        return pluralize_select(count, thing, thing[:-2] + 'a')
-    else:
-        return pluralize_suffix(count, thing)
+
+    if thing.endswith("o"):
+        return pluralize_suffix(count, thing, "es")
+
+    if thing.endswith("on"):
+        return pluralize_select(count, thing, thing[:-2] + "a")
+
+    return pluralize_suffix(count, thing)
 
 
 pluralise_auto = pluralize_auto
 
 
 def dict_format(args, formats):
-    """
-    :type args: dict[unknown, unknown]
-    :type formats: list[str]
-    :rtype: str
-    """
-    matches = {}
+    matches: dict[str, int] = {}
     for f in formats:
         try:
             # Check if values can be mapped
             m = f.format(**args)
             # Insert match and number of matched values (max matched values if already in dict)
-            matches[m] = max([matches.get(m, 0), len(re.findall(r'({.*?\})', f))])
-        except Exception:
+            matches[m] = max(
+                [matches.get(m, 0), len(re.findall(r"({.*?\})", f))]
+            )
+        except KeyError:
             continue
 
     # Return most complete match, ranked by values matched and then my match length or None
-    try:
-        return max(matches.items(), key=lambda x: (x[1], len(x[0])))[0]
-    except Exception:
+    if not matches:
         return None
+
+    return max(matches.items(), key=lambda x: (x[1], len(x[0])))[0]
 
 
 # DJANGO LICENCE
 
-split_re = re.compile(r"""((?:[^\s'"]*(?:(?:"(?:[^"\\]|\\.)*" | '(?:["""
-                      r"""^'\\]|\\.)*')[^\s'"]*)+) | \S+)""", re.VERBOSE)
+split_re = re.compile(
+    r"""((?:[^\s'"]*(?:(?:"(?:[^"\\]|\\.)*" | '(?:["""
+    r"""^'\\]|\\.)*')[^\s'"]*)+) | \S+)""",
+    re.VERBOSE,
+)
 
 
 def smart_split(text):
-    """
+    r"""
     Generator that splits a string by spaces, leaving quoted phrases together.
     Supports both single and double quotes, and supports escaping quotes with
     backslashes. In the output, strings will keep their initial and trailing
     quote marks and escaped quotes will remain escaped (the results can then
     be further processed with unescape_string_literal()).
 
-    >> list(smart_split(r'This is "a person\'s" test.'))
+    >>> list(smart_split(r'This is "a person\'s" test.'))
     ['This', 'is', '"a person\\\'s"', 'test.']
-    >> list(smart_split(r"Another 'person\'s' test."))
+    >>> list(smart_split(r"Another 'person\'s' test."))
     ['Another', "'person\\'s'", 'test.']
-    >> list(smart_split(r'A "\"funky\" style" test.'))
+    >>> list(smart_split(r'A "\"funky\" style" test.'))
     ['A', '"\\"funky\\" style"', 'test.']
     """
     for bit in split_re.finditer(text):
         yield bit.group(0)
 
 
-def get_text_list(list_, last_word='or'):
+def get_text_list(list_, last_word="or"):
     """
-    >> get_text_list(['a', 'b', 'c', 'd'])
+    >>> get_text_list(['a', 'b', 'c', 'd'])
     'a, b, c or d'
-    >> get_text_list(['a', 'b', 'c'], 'and')
+    >>> get_text_list(['a', 'b', 'c'], 'and')
     'a, b and c'
-    >> get_text_list(['a', 'b'], 'and')
+    >>> get_text_list(['a', 'b'], 'and')
     'a and b'
-    >> get_text_list(['a'])
+    >>> get_text_list(['a'])
     'a'
-    >> get_text_list([])
+    >>> get_text_list([])
     ''
     """
-    if len(list_) == 0:
-        return ''
+    if not list_:
+        return ""
+
     if len(list_) == 1:
         return list_[0]
-    return '%s %s %s' % (
+
+    return "{} {} {}".format(
         # Translators: This string is used as a separator between list elements
-        ', '.join([i for i in list_][:-1]),
-        last_word, list_[-1])
+        ", ".join([i for i in list_][:-1]),
+        last_word,
+        list_[-1],
+    )
 
 
 def gen_markdown_table(headers, rows):
@@ -389,9 +385,11 @@ def gen_markdown_table(headers, rows):
     rotated = zip(*reversed(rows))
 
     sizes = tuple(map(lambda l: max(max(map(len, l)), 3), rotated))
-    rows.insert(1, tuple(('-' * size) for size in sizes))
+    rows.insert(1, tuple(("-" * size) for size in sizes))
     lines = [
-        "| {} |".format(' | '.join(cell.ljust(sizes[i]) for i, cell in enumerate(row)))
+        "| {} |".format(
+            " | ".join(cell.ljust(sizes[i]) for i, cell in enumerate(row))
+        )
         for row in rows
     ]
-    return '\n'.join(lines)
+    return "\n".join(lines)

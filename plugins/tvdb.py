@@ -1,170 +1,533 @@
 import datetime
+import logging
+from collections.abc import Container, Iterable, Iterator, Sized
+from enum import Enum
+from functools import wraps
+from typing import Any, Generic, TypeVar, Union, cast, overload
 
 import requests
-from lxml import etree
 
 from cloudbot import hook
+from cloudbot.bot import CloudBot
+from cloudbot.event import Event
+from cloudbot.util import func_utils
+from cloudbot.util.http import GetParams
 
-# security
-parser = etree.XMLParser(resolve_entities=False, no_network=True)
+logger = logging.getLogger(__name__)
+token_lifetime = datetime.timedelta(hours=1)
 
-base_url = "http://thetvdb.com/api/"
+JsonPrimitive = Union[int, str, bool, None]
+JsonObject = dict[
+    str, Union[JsonPrimitive, list[JsonPrimitive], dict[str, JsonPrimitive]]
+]
 
 
-def get_episodes_for_series(series_name, api_key):
-    res = {"error": None, "ended": False, "episodes": None, "name": None}
-    # http://thetvdb.com/wiki/index.php/API:GetSeries
+class NoMatchingSeries(LookupError):
+    pass
+
+
+class TvdbApi:
+    def __init__(self) -> None:
+        self.token_lifetime = token_lifetime
+        self._headers: dict[str, str] | None = None
+        self.base_url = "https://api.thetvdb.com"
+        self.api_version = "3.0.0"
+        self.default_headers = {
+            "Accept": f"application/vnd.thetvdb.v{self.api_version}"
+        }
+
+        self.jwt_token: str | None = None
+        self.refresh_time = datetime.datetime.min
+
+    @property
+    def authed(self) -> bool:
+        return self.jwt_token is not None
+
+    def set_api_key(self, bot: CloudBot) -> None:
+        res = cast(
+            dict[str, str],
+            self._post(
+                "/login", json={"apikey": bot.config.get_api_key("tvdb")}
+            ),
+        )
+        self.set_token(res["token"])
+
+    def refresh_token(self, bot: CloudBot) -> None:
+        if self.jwt_token is None:
+            self.set_api_key(bot)
+            return
+
+        try:
+            res = cast(dict[str, str], self._get("/refresh_token"))
+        except requests.HTTPError as e:
+            if e.response.status_code == 401:
+                self.set_api_key(bot)
+            else:
+                raise
+        else:
+            self.set_token(res["token"])
+
+    def set_token(self, token: str) -> None:
+        self.jwt_token = token
+        self.refresh_time = datetime.datetime.now() + self.token_lifetime
+        # Clear header cache
+        self._headers = None
+
+    def _get(self, path: str, params: GetParams | None = None) -> JsonObject:
+        with requests.get(
+            self.base_url + path, headers=self.headers, params=params or {}
+        ) as response:
+            response.raise_for_status()
+            return cast(JsonObject, response.json())
+
+    def _get_paged(
+        self,
+        path: str,
+        params: GetParams | None = None,
+        reverse: bool = False,
+    ) -> Iterable[JsonObject]:
+        params = params or {}
+        params["page"] = 1
+        first_page = self._get(path, params)
+        links = cast(dict[str, int], first_page.get("links", {}))
+        last_num = links.get("last", 1)
+        if last_num == 1:
+            yield first_page
+            return
+
+        if reverse:
+            page = last_num
+        else:
+            yield first_page
+            page = 2
+
+        while True:
+            params["page"] = page
+            res = self._get(path, params)
+            yield res
+
+            links = cast(dict[str, int], res["links"])
+            if reverse:
+                if page == 2:
+                    break
+
+                page = links["previous"]
+            else:
+                if page == links["last"]:
+                    break
+
+                page = links["next"]
+
+        if reverse:
+            yield first_page
+
+    def _post(self, path: str, json: dict[str, Any]) -> JsonObject:
+        with requests.post(
+            self.base_url + path, headers=self.headers, json=json
+        ) as response:
+            response.raise_for_status()
+            return cast(JsonObject, response.json())
+
+    @property
+    def headers(self) -> dict[str, str]:
+        if self._headers is not None:
+            return self._headers
+
+        self._headers = self.default_headers.copy()
+        if self.jwt_token:
+            self._headers["Authorization"] = f"Bearer {self.jwt_token}"
+
+        return self._headers
+
+    def find_series(self, name: str) -> list[JsonObject]:
+        try:
+            return cast(
+                list[JsonObject],
+                self._get("/search/series", params={"name": name})["data"],
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                raise NoMatchingSeries(name) from e
+
+            raise
+
+    def get_episodes(
+        self, series_id: str, reverse=True
+    ) -> Iterable[JsonObject]:
+        try:
+            for page in self._get_paged(
+                f"/series/{series_id}/episodes", reverse=reverse
+            ):
+                data = cast(list[JsonObject], page["data"])
+                if not reverse:
+                    yield from data
+                else:
+                    yield from reversed(data)
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                # 404 means no episodes
+                return
+
+            raise
+
+
+api = TvdbApi()
+
+
+class MissingItem(Exception):
+    pass
+
+
+T = TypeVar("T")
+
+
+class Holder(Generic[T]):
+    """
+    >>> holder = Holder()
+    >>> holder.exists()
+    False
+    >>> holder.set(object())
+    >>> holder.exists()
+    True
+    >>> holder.clear()
+    >>> holder.exists()
+    False
+    """
+
+    def __init__(self) -> None:
+        self._item: T | None = None
+        self._set = False
+
+    def set(self, item: T) -> None:
+        self._item = item
+        self._set = True
+
+    def clear(self) -> None:
+        self._item = None
+        self._set = False
+
+    @classmethod
+    def empty(cls) -> "Holder[T]":
+        return cls()
+
+    @classmethod
+    def of(cls, item: T) -> "Holder[T]":
+        obj = cls()
+        obj.set(item)
+        return obj
+
+    @classmethod
+    def of_optional(cls, item: T | None) -> "Holder[T]":
+        obj = cls()
+        if item is not None:
+            obj.set(item)
+
+        return obj
+
+    def exists(self) -> bool:
+        return self._set
+
+    def get(self) -> T:
+        if not self._set:
+            raise MissingItem()
+
+        return self._item
+
+
+class LazyCollection(Sized, Iterable[T], Container[T]):
+    """
+    >>> col = LazyCollection([1])
+    >>> col[0:5]
+    [1]
+    >>> col = LazyCollection([1])
+    >>> col[-1]
+    1
+    >>> col = LazyCollection([])
+    >>> len(col)
+    0
+    >>> col = LazyCollection(['a'])
+    >>> 'a' in col
+    True
+    >>> 'a' in col
+    True
+    >>> 'b' in col
+    False
+    >>> col[1]
+    Traceback (most recent call last):
+        ...
+    IndexError: list index out of range
+    >>> col = LazyCollection(['a'])
+    >>> 'c' in col
+    False
+    >>> col = LazyCollection(['a', 'b', 'c'])
+    >>> list(col)
+    ['a', 'b', 'c']
+    >>> col = LazyCollection(['a'])
+    >>> col[0]
+    'a'
+    >>> col[0]
+    'a'
+    """
+
+    def __init__(self, it: Iterable[T]) -> None:
+        self._data: list[T] = []
+        self._it = iter(it)
+        self._complete = False
+
+    def __len__(self) -> int:
+        self._gen_all()
+        return len(self._data)
+
+    def _get_next(self) -> Holder[T]:
+        try:
+            item = next(self._it)
+        except StopIteration:
+            self._complete = True
+            return Holder.empty()
+        else:
+            self._data.append(item)
+            return Holder.of(item)
+
+    def __iter__(self) -> Iterator[T]:
+        yield from self._data
+        while True:
+            holder = self._get_next()
+            if not holder.exists():
+                break
+
+            yield holder.get()
+
+    def __contains__(self, needle: object) -> bool:
+        if needle in self._data:
+            return True
+
+        while True:
+            holder = self._get_next()
+            if not holder.exists():
+                return False
+
+            if holder.get() == needle:
+                return True
+
+    def _gen_to_index(self, i: int) -> None:
+        current_size = len(self._data)
+        if i >= current_size:
+            for _ in range((i - current_size) + 1):
+                try:
+                    self._data.append(next(self._it))
+                except StopIteration:
+                    return
+
+    def _gen_all(self) -> None:
+        self._data.extend(self._it)
+        self._complete = True
+
+    def _gen_bounds(self, i: int) -> None:
+        if self._complete:
+            return
+
+        if i < 0:
+            self._gen_all()
+        else:
+            self._gen_to_index(i)
+
+    @overload
+    def __getitem__(self, item: int) -> T: ...
+
+    @overload
+    def __getitem__(self, item: slice) -> list[T]: ...
+
+    def __getitem__(self, item: int | slice) -> T | list[T]:
+        if isinstance(item, slice):
+            self._gen_bounds(item.start)
+            self._gen_bounds(item.stop)
+        else:
+            self._gen_bounds(item)
+
+        return self._data[item]
+
+
+class EpisodeInfo:
+    def __init__(
+        self,
+        first_aired: datetime.date | None,
+        episode_number: int,
+        season: int,
+        name: str | None,
+    ) -> None:
+        self.episode_number = episode_number
+        self.season = season
+        self.first_aired = first_aired
+        self.name = name
+
+    @classmethod
+    def from_json(cls, json: dict[str, Any]) -> "EpisodeInfo":
+        first_aired = json.get("firstAired")
+        if not first_aired:
+            air_date = None
+        else:
+            air_date = datetime.datetime.strptime(
+                first_aired, "%Y-%m-%d"
+            ).date()
+
+        episode_number = json["airedEpisodeNumber"]
+        season = json["airedSeason"]
+
+        name = json.get("episodeName")
+        if name == "TBA":
+            name = None
+
+        return cls(
+            first_aired=air_date,
+            episode_number=episode_number,
+            season=season,
+            name=name,
+        )
+
+    @property
+    def full_number(self) -> str:
+        return f"S{self.season:02d}E{self.episode_number:02d}"
+
+    @property
+    def description(self) -> str:
+        episode_desc = f"{self.full_number}"
+        if self.name:
+            episode_desc += f" - {self.name}"
+
+        return episode_desc
+
+
+class Status(Enum):
+    ENDED = "Ended"
+    CONTINUING = "Continuing"
+    UPCOMING = "Upcoming"
+
+
+class SeriesInfo:
+    def __init__(
+        self, name: str, episodes: Iterable[dict[str, Any]], status: Status
+    ) -> None:
+        self.name = name
+        self.episodes = LazyCollection(map(EpisodeInfo.from_json, episodes))
+        self.status = status
+
+    @property
+    def ended(self) -> bool:
+        return self.status is Status.ENDED
+
+
+def get_episodes_for_series(series_name: str) -> SeriesInfo:
+    search_results = api.find_series(series_name)
+    series = search_results[0]
+    status = Status(series["status"])
+
+    episodes = api.get_episodes(cast(str, series["id"]))
+
+    return SeriesInfo(cast(str, series["seriesName"]), episodes, status)
+
+
+def check_and_get_series(
+    series: str,
+) -> tuple[SeriesInfo, None] | tuple[None, str]:
+    if not api.authed:
+        return None, "TVDB API not enabled."
 
     try:
-        params = {'seriesname': series_name}
-        request = requests.get(base_url + 'GetSeries.php', params=params)
-        request.raise_for_status()
-    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
-        res["error"] = "error contacting thetvdb.com"
-        return res
-
-    query = etree.fromstring(request.content, parser=parser)
-    series_id = query.xpath('//seriesid/text()')
-
-    if not series_id:
-        res["error"] = "Unknown TV series. (using www.thetvdb.com)"
-        return res
-
-    series_id = series_id[0]
-
-    try:
-        _request = requests.get(base_url + '%s/series/%s/all/en.xml' % (api_key, series_id))
-        _request.raise_for_status()
-    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
-        res["error"] = "error contacting thetvdb.com"
-        return res
-
-    series = etree.fromstring(_request.content, parser=parser)
-    try:
-        series_name = series.xpath('//SeriesName/text()')[0]
-    except LookupError:
-        series_name = series.xpath('//SeriesName/text()')
-    try:
-        if series.xpath('//Status/text()')[0] == 'Ended':
-            res["ended"] = True
-    except LookupError:
-        if series.xpath('//Status/text()') == 'Ended':
-            res["ended"] = True
-
-    res["episodes"] = series.xpath('//Episode')
-    res["name"] = series_name
-    return res
+        return get_episodes_for_series(series), None
+    except NoMatchingSeries:
+        return None, "Unable to find series"
 
 
-def get_episode_info(episode):
-    first_aired = episode.findtext("FirstAired")
-
-    try:
-        air_date = datetime.date(*list(map(int, first_aired.split('-'))))
-    except (ValueError, TypeError):
-        return None
-
-    episode_num = "S%02dE%02d" % (int(episode.findtext("SeasonNumber")),
-                                  int(episode.findtext("EpisodeNumber")))
-
-    episode_name = episode.findtext("EpisodeName")
-    # in the event of an unannounced episode title, users either leave the
-    # field out (None) or fill it with TBA
-    if episode_name == "TBA":
-        episode_name = None
-
-    episode_desc = '{}'.format(episode_num)
-    if episode_name:
-        episode_desc += ' - {}'.format(episode_name)
-    return first_aired, air_date, episode_desc
+def handle_error(event: Event, error):
+    event.reply("Failed to contact thetvdb.com")
+    raise error
 
 
-@hook.command()
-@hook.command('tv')
-def tv_next(text, bot=None):
+def _error_handler(exc_type, handler):
+    def decorator(f):
+        @wraps(f)
+        def func(event):
+            try:
+                return func_utils.call_with_args(f, event)
+            except exc_type as e:
+                return handler(event, e)
+
+        return func
+
+    return decorator
+
+
+@hook.on_start()
+@hook.periodic(token_lifetime.total_seconds())
+def refresh(bot: CloudBot) -> None:
+    api.refresh_token(bot)
+
+
+@hook.command("tv_next", "tv")
+@_error_handler(requests.HTTPError, handle_error)
+def tv_next(text: str) -> str:
     """<series> - Get the next episode of <series>."""
+    series, err = check_and_get_series(text)
+    if err is not None:
+        return err
 
-    api_key = bot.config.get("api_keys", {}).get("tvdb", None)
-    if api_key is None:
-        return "error: no api key set"
-    episodes = get_episodes_for_series(text, api_key)
-
-    if episodes["error"]:
-        return episodes["error"]
-
-    series_name = episodes["name"]
-    ended = episodes["ended"]
-    episodes = episodes["episodes"]
-
-    if ended:
-        return "{} has ended.".format(series_name)
+    if series.ended:
+        return f"{series.name} has ended."
 
     next_eps = []
     today = datetime.date.today()
 
-    for episode in reversed(episodes):
-        ep_info = get_episode_info(episode)
-
-        if ep_info is None:
-            continue
-
-        (first_aired, air_date, episode_desc) = ep_info
-
-        if air_date > today:
-            next_eps = ['{} ({})'.format(first_aired, episode_desc)]
-        elif air_date == today:
-            next_eps = ['Today ({})'.format(episode_desc)] + next_eps
-        else:
-            # we're iterating in reverse order with newest episodes last
-            # so, as soon as we're past today, break out of loop
+    for episode in series.episodes:
+        if episode.first_aired is not None and episode.first_aired < today:
             break
 
+        if episode.first_aired is None:
+            date_str = "TBA"
+        elif episode.first_aired == today:
+            date_str = "Today"
+        else:
+            date_str = str(episode.first_aired)
+
+        next_eps.append(f"{date_str} ({episode.description})")
+
     if not next_eps:
-        return "There are no new episodes scheduled for {}.".format(series_name)
+        return f"There are no new episodes scheduled for {series.name}."
 
     if len(next_eps) == 1:
-        return "The next episode of {} airs {}".format(series_name, next_eps[0])
-    else:
-        next_eps = ', '.join(next_eps)
-        return "The next episodes of {}: {}".format(series_name, next_eps)
+        return f"The next episode of {series.name} airs {next_eps[0]}"
+
+    return "The next episodes of {}: {}".format(
+        series.name, ", ".join(reversed(next_eps))
+    )
 
 
-@hook.command()
-@hook.command('tv_prev')
-def tv_last(text, bot=None):
+@hook.command("tv_last", "tv_prev")
+@_error_handler(requests.HTTPError, handle_error)
+def tv_last(text: str) -> str:
     """<series> - Gets the most recently aired episode of <series>."""
-
-    api_key = bot.config.get("api_keys", {}).get("tvdb", None)
-    if api_key is None:
-        return "error: no api key set"
-    episodes = get_episodes_for_series(text, api_key)
-
-    if episodes["error"]:
-        return episodes["error"]
-
-    series_name = episodes["name"]
-    ended = episodes["ended"]
-    episodes = episodes["episodes"]
+    series, err = check_and_get_series(text)
+    if err is not None:
+        return err
 
     prev_ep = None
     today = datetime.date.today()
 
-    for episode in reversed(episodes):
-        ep_info = get_episode_info(episode)
-
-        if ep_info is None:
+    for episode in series.episodes:
+        if episode.first_aired is None:
             continue
 
-        (first_aired, air_date, episode_desc) = ep_info
-
-        if air_date < today:
-            # iterating in reverse order, so the first episode encountered
-            # before today was the most recently aired
-            prev_ep = '{} ({})'.format(first_aired, episode_desc)
+        if episode.first_aired < today:
+            prev_ep = f"{episode.first_aired} ({episode.description})"
             break
 
     if not prev_ep:
-        return "There are no previously aired episodes for {}.".format(series_name)
-    if ended:
-        return '{} ended. The last episode aired {}.'.format(series_name, prev_ep)
-    return "The last episode of {} aired {}.".format(series_name, prev_ep)
+        return "There are no previously aired episodes for {}.".format(
+            series.name
+        )
+
+    if series.ended:
+        return "{} ended. The last episode aired {}.".format(
+            series.name, prev_ep
+        )
+
+    return f"The last episode of {series.name} aired {prev_ep}."

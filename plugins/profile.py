@@ -7,84 +7,70 @@ from sqlalchemy import Column, String, Table, and_
 
 from cloudbot import hook
 from cloudbot.util import database
-from cloudbot.util.pager import paginated_list
+from cloudbot.util.pager import CommandPager, paginated_list
 
 category_re = r"[A-Za-z0-9]+"
-data_re = re.compile(r"({})\s(.+)".format(category_re))
+data_re = re.compile(rf"({category_re})\s(.+)")
 
 # borrowed pagination code from grab.py
-cat_pages = defaultdict(dict)
-confirm_keys = defaultdict(dict)
+cat_pages: dict[str, dict[str, CommandPager]] = defaultdict(dict)
+confirm_keys: dict[str, dict[str, str]] = defaultdict(dict)
 
 table = Table(
-    'profile',
+    "profile",
     database.metadata,
-    Column('chan', String),
-    Column('nick', String),
-    Column('category', String),
-    Column('text', String)
+    Column("chan", String),
+    Column("nick", String),
+    Column("category", String),
+    Column("text", String),
 )
 
-profile_cache = {}
+profile_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 
 @hook.on_start()
 def load_cache(db):
-    """
-    :type db: sqlalchemy.orm.Session
-    """
-    profile_cache.clear()
+    new_cache = profile_cache.copy()
+    new_cache.clear()
     for row in db.execute(table.select().order_by(table.c.category)):
-        nick = row["nick"].lower()
-        cat = row["category"]
-        text = row["text"]
-        chan = row["chan"]
-        profile_cache.setdefault(chan, {}).setdefault(nick, {})[cat] = text
+        nick = row.nick.lower()
+        cat = row.category
+        text = row.text
+        chan = row.chan
+        new_cache.setdefault(chan, {}).setdefault(nick, {})[cat] = text
+
+    profile_cache.clear()
+    profile_cache.update(new_cache)
 
 
 def format_profile(nick, category, text):
     # Add zwsp to avoid pinging users
-    nick = "{}{}{}".format(nick[0], "\u200B", nick[1:])
-    msg = "{}->{}: {}".format(nick, category, text)
+    nick = "{}{}{}".format(nick[0], "\u200b", nick[1:])
+    msg = f"{nick}->{category}: {text}"
     return msg
 
 
 # modified from grab.py
 @hook.command("moreprofile", autohelp=False)
 def moreprofile(text, chan, nick, notice):
-    """[page] - If a category search has lots of results the results are paginated. If the most recent search is paginated the pages are stored for retrieval. If no argument is given the next page will be returned else a page number can be specified."""
+    """[page] - If a category search has lots of results the results are paginated. If the most recent search is
+    paginated the pages are stored for retrieval. If no argument is given the next page will be returned else a page
+    number can be specified."""
     chan_pages = cat_pages[chan.casefold()]
     pages = chan_pages.get(nick.casefold())
     if not pages:
         notice("There are no category pages to show.")
         return
 
-    if text:
-        try:
-            index = int(text)
-        except ValueError:
-            notice("Please specify a positive integer value")
-            return
-
-        page = pages[index - 1]
-        if page is None:
-            notice("Please specify a valid page number between 1 and {}.".format(len(pages)))
-            return
-        else:
-            for line in page:
-                notice(line)
-    else:
-        page = pages.next()
-        if page is not None:
-            for line in page:
-                notice(line)
-        else:
-            notice("All pages have been shown. You can specify a page number or start a new search")
+    page = pages.handle_lookup(text)
+    for line in page:
+        notice(line)
 
 
 @hook.command()
 def profile(text, chan, notice, nick):
-    """<nick> [category] - Returns a user's saved profile data from \"<category>\", or lists all available profile categories for the user if no category specified"""
+    """<nick> [category] - Returns a user's saved profile data from \"<category>\", or lists all available profile
+    categories for the user if no category specified"""
     chan_cf = chan.casefold()
     nick_cf = nick.casefold()
 
@@ -100,37 +86,42 @@ def profile(text, chan, notice, nick):
     pnick_cf = pnick.casefold()
     user_profile = chan_profiles.get(pnick_cf, {})
     if not user_profile:
-        notice("User {} has no profile data saved in this channel".format(pnick))
-        return
+        notice(f"User {pnick} has no profile data saved in this channel")
+        return None
 
     # Check if the caller specified a profile category, if not, send a NOTICE with the users registered categories
     if not unpck:
         cats = list(user_profile.keys())
 
-        pager = paginated_list(cats, ', ')
+        pager = paginated_list(cats, ", ", pager_cls=CommandPager)
         cat_pages[chan_cf][nick_cf] = pager
         page = pager.next()
-        page[0] = "Categories: {}".format(page[0])
+        page[0] = f"Categories: {page[0]}"
         if len(pager) > 1:
             page[-1] += " .moreprofile"
 
         for line in page:
             notice(line)
 
-    else:
-        category = unpck.pop(0)
-        cat_cf = category.casefold()
-        if cat_cf not in user_profile:
-            notice("User {} has no profile data for category {} in this channel".format(pnick, category))
+        return None
 
-        else:
-            content = user_profile[cat_cf]
-            return format_profile(pnick, category, content)
+    category = unpck.pop(0)
+    cat_cf = category.casefold()
+    if cat_cf not in user_profile:
+        notice(
+            "User {} has no profile data for category {} in this channel".format(
+                pnick, category
+            )
+        )
+        return None
+
+    content = user_profile[cat_cf]
+    return format_profile(pnick, category, content)
 
 
 @hook.command()
 def profileadd(text, chan, nick, notice, db):
-    """<category> <content> - Adds data to your profile in the current channel under \"<category>\""""
+    """<category> <content> - Adds data to your profile in the current channel under \"<category>\" """
     if nick.casefold() == chan.casefold():
         return "Profile data can not be set outside of channels"
 
@@ -138,24 +129,38 @@ def profileadd(text, chan, nick, notice, db):
 
     if not match:
         notice("Invalid data")
-    else:
-        chan_profiles = profile_cache.get(chan.casefold(), {})
-        user_profile = chan_profiles.get(nick.casefold(), {})
-        cat, data = match.groups()
-        if cat.casefold() not in user_profile:
-            db.execute(
-                table.insert().values(chan=chan.casefold(), nick=nick.casefold(), category=cat.casefold(), text=data))
-            db.commit()
-            load_cache(db)
-            return "Created new profile category {}".format(cat)
+        return None
 
-        else:
-            db.execute(table.update().values(text=data).where((and_(table.c.nick == nick.casefold(),
-                                                                    table.c.chan == chan.casefold(),
-                                                                    table.c.category == cat.casefold()))))
-            db.commit()
-            load_cache(db)
-            return "Updated profile category {}".format(cat)
+    chan_profiles = profile_cache.get(chan.casefold(), {})
+    user_profile = chan_profiles.get(nick.casefold(), {})
+    cat, data = match.groups()
+    if cat.casefold() not in user_profile:
+        db.execute(
+            table.insert().values(
+                chan=chan.casefold(),
+                nick=nick.casefold(),
+                category=cat.casefold(),
+                text=data,
+            )
+        )
+        db.commit()
+        load_cache(db)
+        return f"Created new profile category {cat}"
+
+    db.execute(
+        table.update()
+        .values(text=data)
+        .where(
+            and_(
+                table.c.nick == nick.casefold(),
+                table.c.chan == chan.casefold(),
+                table.c.category == cat.casefold(),
+            )
+        )
+    )
+    db.commit()
+    load_cache(db)
+    return f"Updated profile category {cat}"
 
 
 @hook.command()
@@ -170,14 +175,20 @@ def profiledel(nick, chan, text, notice, db):
     user_profile = chan_profiles.get(nick.casefold(), {})
     if category.casefold() not in user_profile:
         notice("That category does not exist in your profile")
-        return
+        return None
 
-    db.execute(table.delete().where((and_(table.c.nick == nick.casefold(),
-                                          table.c.chan == chan.casefold(),
-                                          table.c.category == category.casefold()))))
+    db.execute(
+        table.delete().where(
+            and_(
+                table.c.nick == nick.casefold(),
+                table.c.chan == chan.casefold(),
+                table.c.category == category.casefold(),
+            )
+        )
+    )
     db.commit()
     load_cache(db)
-    return "Deleted profile category {}".format(category)
+    return f"Deleted profile category {category}"
 
 
 @hook.command(autohelp=False)
@@ -187,19 +198,33 @@ def profileclear(nick, chan, text, notice, db):
         return "Profile data can not be set outside of channels"
 
     if text:
-        if nick in confirm_keys[chan.casefold()] and text == confirm_keys[chan.casefold()][nick.casefold()]:
+        if (
+            nick in confirm_keys[chan.casefold()]
+            and text == confirm_keys[chan.casefold()][nick.casefold()]
+        ):
             del confirm_keys[chan.casefold()][nick.casefold()]
-            db.execute(table.delete().where((and_(table.c.nick == nick.casefold(),
-                                                  table.c.chan == chan.casefold()))))
+            db.execute(
+                table.delete().where(
+                    and_(
+                        table.c.nick == nick.casefold(),
+                        table.c.chan == chan.casefold(),
+                    )
+                )
+            )
             db.commit()
             load_cache(db)
-            return "Profile data cleared for {}.".format(nick)
-        else:
-            notice("Invalid confirm key")
-            return
-    else:
-        key = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
-        confirm_keys[chan.casefold()][nick.casefold()] = key
-        notice("Are you sure you want to clear all of your profile data in {}? use \".profileclear {}\" to confirm"
-               .format(chan, key))
-        return
+            return f"Profile data cleared for {nick}."
+
+        notice("Invalid confirm key")
+        return None
+
+    key = "".join(
+        random.choice(string.ascii_letters + string.digits) for _ in range(10)
+    )
+    confirm_keys[chan.casefold()][nick.casefold()] = key
+    notice(
+        'Are you sure you want to clear all of your profile data in {}? use ".profileclear {}" to confirm'.format(
+            chan, key
+        )
+    )
+    return None
