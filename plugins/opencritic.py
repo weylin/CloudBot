@@ -13,6 +13,13 @@ headers = {
     'content-type': "application/json",
     'x-rapidapi-host': "opencritic-api.p.rapidapi.com"
 }
+api_key = None
+
+
+@hook.on_start()
+def load_key(bot):
+    global api_key
+    api_key = bot.config.get("api_keys", {}).get("opencritic")
 platformList = {
     ('switch', 'nintendo', 'nintendo switch'): '32',
     ('sony', 'playstation', 'playstation 4', 'ps4', 'psn'): '6',
@@ -54,13 +61,12 @@ def oc(text, bot):
     dateUrl = url + 'game/filter'
     games = []
 
-    # Get API key from config if available
-    api_key = bot.config.get("api_keys", {}).get("opencritic")
     local_headers = headers.copy()
     if api_key:
         local_headers['x-rapidapi-key'] = api_key
 
     searchQuery = {
+
         'criteria': text
     }
 
@@ -120,13 +126,12 @@ def octop(text, bot):
     searchUrl = url + 'game/filter'
     output = []
 
-    # Get API key from config if available
-    api_key = bot.config.get("api_keys", {}).get("opencritic")
     local_headers = headers.copy()
     if api_key:
         local_headers['x-rapidapi-key'] = api_key
 
     args = text.split(' ')
+
 
     if len(args[0]) == 0:
         text = ''
@@ -207,8 +212,6 @@ def ocup(text, bot):
     output = []
     startDate = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    # Get API key from config if available
-    api_key = bot.config.get("api_keys", {}).get("opencritic")
     local_headers = headers.copy()
     if api_key:
         local_headers['x-rapidapi-key'] = api_key
