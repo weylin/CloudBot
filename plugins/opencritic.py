@@ -1,7 +1,5 @@
 import requests
 import datetime
-import re
-import fuzzywuzzy
 import pickle
 import os.path
 
@@ -20,6 +18,8 @@ api_key = None
 def load_key(bot):
     global api_key
     api_key = bot.config.get("api_keys", {}).get("opencritic")
+
+
 platformList = {
     ('switch', 'nintendo', 'nintendo switch'): '32',
     ('sony', 'playstation', 'playstation 4', 'ps4', 'psn'): '6',
@@ -32,51 +32,46 @@ platformList = {
     ('vita', 'ps vita', 'psp'): '33'
 }
 
-knownPlatforms = {'switch', 'nintendo', 'nintendo switch',
-                  'sony', 'playstation', 'playstation 4', 'ps4', 'psn',
-                  'microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl',
-                  'windows', 'pc',
-                  '3ds', 'nintendo 3ds',
-                  'vive', 'htc', 'htc vive', 'rift', 'oculus', 'oculus rift', 'vr', 'hmd',
-                  'vita', 'ps vita', 'psp'}
+knownPlatforms = {
+    'switch', 'nintendo', 'nintendo switch',
+    'sony', 'playstation', 'playstation 4', 'ps4', 'psn',
+    'microsoft', 'ms', 'xbox', 'xbox one', 'xbox 1', 'xb1', 'xbl',
+    'windows', 'pc',
+    '3ds', 'nintendo 3ds',
+    'vive', 'htc', 'htc vive', 'rift', 'oculus', 'oculus rift', 'vr', 'hmd',
+    'vita', 'ps vita', 'psp'
+}
 
 
 def platformCategory(text):
-    platformId = ''
-
-    for platform, id in platformList.items():
+    for platform, platform_id in platformList.items():
         if text.lower() in platform:
-            platformId = id
+            return platform_id
 
-    if len(platformId) == 0:
-        platformId += '6,7,27,29,30,32,33,36'
+    return '6,7,27,29,30,32,33,36'
 
-    return platformId
+
+def get_headers():
+    local_headers = headers.copy()
+    if api_key:
+        local_headers['x-rapidapi-key'] = api_key
+    return local_headers
 
 
 @hook.command('oc')
 def oc(text, bot):
-    searchUrl = url + 'game/search'
-    scoreUrl = url + 'game/score'
-    dateUrl = url + 'game/filter'
-    games = []
+    search_url = url + 'game/search'
 
-    local_headers = headers.copy()
-    if api_key:
-        local_headers['x-rapidapi-key'] = api_key
+    params = {'criteria': text}
+    resp = requests.get(search_url, headers=get_headers(), params=params)
 
-    searchQuery = {
-
-        'criteria': text
-    }
-
-    resp = requests.request(
-        "GET", searchUrl, headers=local_headers, params=searchQuery)
-    
-    if resp.status_code == 403 or resp.status_code == 401:
+    if resp.status_code in (401, 403):
         return "OpenCritic API key is missing or invalid. Please check the bot configuration."
 
-    response = resp.json()
+    try:
+        response = resp.json()
+    except ValueError:
+        return "Error: Received non-JSON response from OpenCritic API."
 
     if isinstance(response, dict) and "message" in response:
         return "OpenCritic API Error: {}".format(response["message"])
@@ -85,86 +80,85 @@ def oc(text, bot):
         return "No games found for '{}'.".format(text)
 
     choices = [item['name'] for item in response]
-    bestChoice = process.extract(text, choices, limit=1)[0][0]
+    best_choice, _ = process.extractOne(text, choices)
 
-    gameId = None
-    for item in response:
-        if item['name'] == bestChoice:
-            gameId = item['id']
-            gameTitle = item['name']
-            break
+    game_id = next((item['id'] for item in response if item['name'] == best_choice), None)
 
-    if gameId is None:
+    if game_id is None:
         return "Could not find a matching game for '{}'.".format(text)
 
-    # Fetch full game details (including score and date) in one call
-    detail_url = url + 'game/{}'.format(gameId)
-    detail_resp = requests.get(detail_url, headers=local_headers)
-    
-    if detail_resp.status_code != 200:
-        return "Error fetching details for '{}' (HTTP {}).".format(gameTitle, detail_resp.status_code)
+    # Fetch full game details
+    detail_url = url + 'game/{}'.format(game_id)
+    detail_resp = requests.get(detail_url, headers=get_headers())
 
-    game_data = detail_resp.json()
-    
-    gameUrl = game_data.get('url', 'http://opencritic.com/game/{}'.format(gameId))
-    gameDate = game_data.get('firstReleaseDate', '????-??-??')[:10]
+    if detail_resp.status_code != 200:
+        return "Error fetching details for '{}' (HTTP {}).".format(best_choice, detail_resp.status_code)
 
     try:
-        score = game_data.get('topCriticScore', -1)
-        if score == -1:
-            return '\x02{}\x02 releases on {}.'.format(gameTitle, gameDate)
-        
-        gameScore = round(float(score))
+        game_data = detail_resp.json()
+    except ValueError:
+        return "Error: Received non-JSON response from OpenCritic API for game details."
+
+    game_url = game_data.get('url', 'http://opencritic.com/game/{}'.format(game_id))
+    game_date = game_data.get('firstReleaseDate', '????-??-??')[:10]
+
+    score = game_data.get('topCriticScore', -1)
+    if score == -1:
+        return '\x02{}\x02 releases on {}.'.format(best_choice, game_date)
+
+    try:
+        game_score = round(float(score))
+        return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(best_choice, game_score, game_url)
     except (TypeError, ValueError):
-        return '\x02{}\x02 releases on {}.'.format(gameTitle, gameDate)
-    else:
-        return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(gameTitle, gameScore, gameUrl)
+        return '\x02{}\x02 releases on {}.'.format(best_choice, game_date)
 
 
 @hook.command('octop')
 def octop(text, bot):
-    searchUrl = url + 'game/filter'
+    filter_url = url + 'game/filter'
     output = []
+    args = text.split()
 
-    local_headers = headers.copy()
-    if api_key:
-        local_headers['x-rapidapi-key'] = api_key
-
-    args = text.split(' ')
-
-
-    if len(args[0]) == 0:
-        text = ''
-        startDate = datetime.datetime.now().year
-    
+    if not args:
+        platform_text = ''
+        start_year = datetime.datetime.now().year
     elif len(args) == 1:
-        for arg in args:
-            if arg in knownPlatforms:
-                text = arg
-                startDate = datetime.datetime.now().year
-            else:
-                startDate = arg
-                text = ''
-
+        arg = args[0]
+        if arg in knownPlatforms:
+            platform_text = arg
+            start_year = datetime.datetime.now().year
+        else:
+            platform_text = ''
+            start_year = arg
     elif len(args) == 2:
-        for arg in args:
-            if arg in knownPlatforms:
-                text = arg
-            else:
-                startDate = arg
-
+        platform_text = next((arg for arg in args if arg in knownPlatforms), '')
+        start_year = next((arg for arg in args if arg not in knownPlatforms), datetime.datetime.now().year)
     else:
-        return 'Stop arguing so much. (Limit 2 arguments, platform and/or year.)'
+        return 'Stop arguing so much. (Limit 2 arguments: platform and/or year.)'
 
-    data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "score", "limit": 5, "includeOnlyBase": true, "startDate": "' + str(
-        startDate) + '-1-1", "endDate": "' + str(startDate) + '-12-31", "minTime": true}'
-
-    resp = requests.post(searchUrl, headers=local_headers, data=data)
+    payload = {
+        "Platforms": [int(i) if ',' not in i else [int(x) for x in i.split(',')] for i in [platformCategory(platform_text)]][0],
+        "orderBy": "score",
+        "limit": 5,
+        "includeOnlyBase": True,
+        "startDate": "{}-01-01".format(start_year),
+        "endDate": "{}-12-31".format(start_year),
+        "minTime": True
+    }
     
-    if resp.status_code == 403 or resp.status_code == 401:
+    # Handle the flattened platform list correctly if platformCategory returns a comma-separated string
+    platforms_raw = platformCategory(platform_text)
+    platforms = [int(x) for x in platforms_raw.split(',')]
+    payload["Platforms"] = platforms
+
+    resp = requests.post(filter_url, headers=get_headers(), json=payload)
+    if resp.status_code in (401, 403):
         return "OpenCritic API key is missing or invalid."
 
-    response = resp.json()
+    try:
+        response = resp.json()
+    except ValueError:
+        return "Error: Received non-JSON response from OpenCritic API."
 
     if isinstance(response, dict) and "message" in response:
         return "OpenCritic API Error: {}".format(response["message"])
@@ -173,58 +167,60 @@ def octop(text, bot):
         return "Unexpected response from OpenCritic API."
 
     for i in response:
-        output.append('\x02{}\x02: {}'.format(
-            i['name'], round(float(i['score']))))
-    
-    if len(args[0]) == 0:
-        if os.path.exists('OpenCritic.pkl'):
-            octopReadFile = open('OpenCritic.pkl', 'rb')
+        try:
+            output.append('\x02{}\x02: {}'.format(i['name'], round(float(i['score']))))
+        except (KeyError, TypeError, ValueError):
+            continue
 
-            octopOld = pickle.load(octopReadFile)
+    if not output:
+        return "No highly-rated games found for the specified criteria."
 
-            octopReadFile.close
+    result = ', '.join(output)
 
-            if octopOld == output:
-                return ', '.join(output)
-            else:
-                octopWriteFile = open('OpenCritic.pkl', 'wb')
+    # Caching logic for default 'octop' (no args)
+    if not args:
+        cache_file = 'OpenCritic.pkl'
+        try:
+            if os.path.exists(cache_file):
+                with open(cache_file, 'rb') as f:
+                    cached_output = pickle.load(f)
+                if cached_output == output:
+                    return result
 
-                pickle.dump(output, octopWriteFile)
+            with open(cache_file, 'wb') as f:
+                pickle.dump(output, f)
+        except (IOError, pickle.PickleError):
+            pass  # Fail silently on cache errors
 
-                octopWriteFile.close
-            
-                return ', '.join(output)
-        else:
-            octopWriteFile = open('OpenCritic.pkl', 'wb')
-
-            pickle.dump(output, octopWriteFile)
-
-            octopWriteFile.close
-
-            return ', '.join(output)
-    else:
-        return ', '.join(output)
+    return result
 
 
 @hook.command('ocup')
 def ocup(text, bot):
-    searchUrl = url + 'game/filter'
-    output = []
-    startDate = datetime.datetime.now().strftime("%Y-%m-%d")
+    filter_url = url + 'game/filter'
+    start_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    local_headers = headers.copy()
-    if api_key:
-        local_headers['x-rapidapi-key'] = api_key
+    platforms_raw = platformCategory(text)
+    platforms = [int(x) for x in platforms_raw.split(',')]
 
-    data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "timeAscending", "limit": 5, "includeOnlyBase": true, "startDate": "' + \
-        str(startDate) + '", "minTime": true}'
+    payload = {
+        "Platforms": platforms,
+        "orderBy": "timeAscending",
+        "limit": 5,
+        "includeOnlyBase": True,
+        "startDate": start_date,
+        "minTime": True
+    }
 
-    resp = requests.post(searchUrl, headers=local_headers, data=data)
-    
-    if resp.status_code == 403 or resp.status_code == 401:
+    resp = requests.post(filter_url, headers=get_headers(), json=payload)
+
+    if resp.status_code in (401, 403):
         return "OpenCritic API key is missing or invalid."
 
-    response = resp.json()
+    try:
+        response = resp.json()
+    except ValueError:
+        return "Error: Received non-JSON response from OpenCritic API."
 
     if isinstance(response, dict) and "message" in response:
         return "OpenCritic API Error: {}".format(response["message"])
@@ -233,9 +229,13 @@ def ocup(text, bot):
         return "Unexpected response from OpenCritic API."
 
     output = []
-
     for i in response:
-        output.append('\x02{}\x02: {}'.format(
-            i['name'], i['releaseDate'][:10]))
+        try:
+            output.append('\x02{}\x02: {}'.format(i['name'], i['releaseDate'][:10]))
+        except (KeyError, TypeError):
+            continue
+
+    if not output:
+        return "No upcoming games found."
 
     return ', '.join(output)

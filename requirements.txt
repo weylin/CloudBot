@@ -18,3 +18,5 @@ pythonwhois
 imgurpython
 isodate
 yarl
+fuzzywuzzy
+python-Levenshtein
