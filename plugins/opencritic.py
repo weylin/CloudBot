@@ -8,10 +8,10 @@ import os.path
 from fuzzywuzzy import process
 from cloudbot import hook
 
-url = 'https://api.opencritic.com/api/game/'
+url = 'https://opencritic-api.p.rapidapi.com/'
 headers = {
     'content-type': "application/json",
-    'cache-control': "no-cache"
+    'x-rapidapi-host': "opencritic-api.p.rapidapi.com"
 }
 platformList = {
     ('switch', 'nintendo', 'nintendo switch'): '32',
@@ -48,54 +48,83 @@ def platformCategory(text):
 
 
 @hook.command('oc')
-def oc(text):
-    searchUrl = url + 'search'
-    scoreUrl = url + 'score'
-    dateUrl = url + 'filter'
+def oc(text, bot):
+    searchUrl = url + 'game/search'
+    scoreUrl = url + 'game/score'
+    dateUrl = url + 'game/filter'
     games = []
+
+    # Get API key from config if available
+    api_key = bot.config.get("api_keys", {}).get("opencritic")
+    local_headers = headers.copy()
+    if api_key:
+        local_headers['x-rapidapi-key'] = api_key
 
     searchQuery = {
         'criteria': text
     }
 
-    response = requests.request(
-        "GET", searchUrl, headers=headers, params=searchQuery).json()
+    resp = requests.request(
+        "GET", searchUrl, headers=local_headers, params=searchQuery)
+    
+    if resp.status_code == 403 or resp.status_code == 401:
+        return "OpenCritic API key is missing or invalid. Please check the bot configuration."
+
+    response = resp.json()
+
+    if isinstance(response, dict) and "message" in response:
+        return "OpenCritic API Error: {}".format(response["message"])
+
+    if not response:
+        return "No games found for '{}'.".format(text)
 
     choices = [item['name'] for item in response]
     bestChoice = process.extract(text, choices, limit=1)[0][0]
 
+    gameId = None
     for item in response:
         if item['name'] == bestChoice:
             gameId = item['id']
             gameTitle = item['name']
-            gameUrl = 'http://opencritic.com/game/' + \
-                str(gameId) + '/' + \
-                re.sub('[^0-9a-zA-Z]+', '-', item['name']).lower()
+            break
 
-    games.append(gameId)
+    if gameId is None:
+        return "Could not find a matching game for '{}'.".format(text)
 
-    scoreQuery = {
-        'id': gameId
-    }
-    scoreResponse = requests.request(
-        "GET", scoreUrl, headers=headers, params=scoreQuery).json()
+    # Fetch full game details (including score and date) in one call
+    detail_url = url + 'game/{}'.format(gameId)
+    detail_resp = requests.get(detail_url, headers=local_headers)
+    
+    if detail_resp.status_code != 200:
+        return "Error fetching details for '{}' (HTTP {}).".format(gameTitle, detail_resp.status_code)
 
-    dateQuery = '{"ids": ' + str(games) + ', "orderBy": "timeAscending"}'
-    gameDate = requests.post(dateUrl, headers=headers, data=dateQuery).json()[
-        0]['releaseDate'][:10]
+    game_data = detail_resp.json()
+    
+    gameUrl = game_data.get('url', 'http://opencritic.com/game/{}'.format(gameId))
+    gameDate = game_data.get('firstReleaseDate', '????-??-??')[:10]
 
     try:
-        gameScore = round(float(scoreResponse['score']))
-    except:
+        score = game_data.get('topCriticScore', -1)
+        if score == -1:
+            return '\x02{}\x02 releases on {}.'.format(gameTitle, gameDate)
+        
+        gameScore = round(float(score))
+    except (TypeError, ValueError):
         return '\x02{}\x02 releases on {}.'.format(gameTitle, gameDate)
     else:
         return '\x02{}\x02 - \x02Score:\x02 {} - {}'.format(gameTitle, gameScore, gameUrl)
 
 
 @hook.command('octop')
-def octop(text):
-    searchUrl = url + 'filter'
+def octop(text, bot):
+    searchUrl = url + 'game/filter'
     output = []
+
+    # Get API key from config if available
+    api_key = bot.config.get("api_keys", {}).get("opencritic")
+    local_headers = headers.copy()
+    if api_key:
+        local_headers['x-rapidapi-key'] = api_key
 
     args = text.split(' ')
 
@@ -125,9 +154,20 @@ def octop(text):
     data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "score", "limit": 5, "includeOnlyBase": true, "startDate": "' + str(
         startDate) + '-1-1", "endDate": "' + str(startDate) + '-12-31", "minTime": true}'
 
-    response = requests.post(searchUrl, headers=headers, data=data)
+    resp = requests.post(searchUrl, headers=local_headers, data=data)
+    
+    if resp.status_code == 403 or resp.status_code == 401:
+        return "OpenCritic API key is missing or invalid."
 
-    for i in response.json():
+    response = resp.json()
+
+    if isinstance(response, dict) and "message" in response:
+        return "OpenCritic API Error: {}".format(response["message"])
+
+    if not isinstance(response, list):
+        return "Unexpected response from OpenCritic API."
+
+    for i in response:
         output.append('\x02{}\x02: {}'.format(
             i['name'], round(float(i['score']))))
     
@@ -162,19 +202,36 @@ def octop(text):
 
 
 @hook.command('ocup')
-def ocup(text):
-    searchUrl = url + 'filter'
+def ocup(text, bot):
+    searchUrl = url + 'game/filter'
     output = []
-    startDate = datetime.datetime.now().strftime("%Y-%-m-%-d")
+    startDate = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    # Get API key from config if available
+    api_key = bot.config.get("api_keys", {}).get("opencritic")
+    local_headers = headers.copy()
+    if api_key:
+        local_headers['x-rapidapi-key'] = api_key
 
     data = '{"Platforms": [' + platformCategory(text) + '], "orderBy": "timeAscending", "limit": 5, "includeOnlyBase": true, "startDate": "' + \
         str(startDate) + '", "minTime": true}'
 
-    response = requests.post(searchUrl, headers=headers, data=data)
+    resp = requests.post(searchUrl, headers=local_headers, data=data)
+    
+    if resp.status_code == 403 or resp.status_code == 401:
+        return "OpenCritic API key is missing or invalid."
+
+    response = resp.json()
+
+    if isinstance(response, dict) and "message" in response:
+        return "OpenCritic API Error: {}".format(response["message"])
+
+    if not isinstance(response, list):
+        return "Unexpected response from OpenCritic API."
 
     output = []
 
-    for i in response.json():
+    for i in response:
         output.append('\x02{}\x02: {}'.format(
             i['name'], i['releaseDate'][:10]))
 
