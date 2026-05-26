@@ -111,5 +111,15 @@ class PluginEventHandler(ReloadHandler):
 
 
 class ConfigEventHandler(ReloadHandler):
-    def on_any_event(self, event):
+    def on_created(self, event):
+        self.loader.reload(event.src_path)
+
+    def on_deleted(self, event):
+        self.loader.reload(event.src_path)
+
+    def on_modified(self, event):
+        self.loader.reload(event.src_path)
+
+    def on_moved(self, event):
         self.loader.reload(getattr(event, "dest_path", event.src_path))
+
