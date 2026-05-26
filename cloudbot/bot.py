@@ -239,7 +239,7 @@ class CloudBot:
         self.observer.start()
 
         # Connect to servers
-        yield from asyncio.gather(*[conn.try_connect() for conn in self.connections.values()], loop=self.loop)
+        yield from asyncio.gather(*[conn.try_connect() for conn in self.connections.values()])
 
         # Activate web interface.
         if self.config.get("web", {}).get("enabled", False) and web_installed:
@@ -364,5 +364,5 @@ class CloudBot:
                         break
 
         # Run the tasks
-        yield from asyncio.gather(*run_before_tasks, loop=self.loop)
-        yield from asyncio.gather(*tasks, loop=self.loop)
+        yield from asyncio.gather(*run_before_tasks)
+        yield from asyncio.gather(*tasks)
