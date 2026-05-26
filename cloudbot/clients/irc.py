@@ -239,7 +239,8 @@ class IrcClient(Client):
         """
         params = list(map(str, params))  # turn the tuple of parameters into a list
         if params:
-            params[-1] = ':' + params[-1]
+            if ' ' in params[-1] or params[-1].startswith(':'):
+                params[-1] = ':' + params[-1]
             self.send("{} {}".format(command, ' '.join(params)))
         else:
             self.send(command)
