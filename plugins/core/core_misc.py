@@ -103,9 +103,9 @@ async def onjoin(conn, bot):
     bot.logger.info("[{}|misc] Bot has finished sending join commands for network.".format(conn.name))
 
 
-@hook.irc_raw('376')
+@hook.irc_raw('376', '422')
 async def do_joins(logger, conn):
-    chans = copy(conn.channels)
+    chans = copy(conn.config.get('channels', []))
 
     # Join config-defined channels
     join_throttle = conn.config.get('join_throttle', 0.4)
