@@ -76,8 +76,7 @@ def chat_tracker(event, db, conn):
 
 
 @hook.command(autohelp=False)
-@asyncio.coroutine
-def resethistory(event, conn):
+async def resethistory(event, conn):
     """- resets chat history for the current channel
     :type event: cloudbot.event.Event
     :type conn: cloudbot.client.Client
@@ -107,15 +106,15 @@ def seen(text, nick, chan, db, event, is_nick_valid):
         return "I can't look up that name, its impossible to use!"
 
     last_seen = db.execute(
-        select([table.c.name, table.c.time, table.c.quote])
+        select(table.c.name, table.c.time, table.c.quote)
             .where(table.c.name == text.lower()).where(table.c.chan == chan)
     ).fetchone()
 
     if last_seen:
-        reltime = timeformat.time_since(last_seen[1])
-        if last_seen[2][0:1] == "\x01":
-            return '{} was last seen {} ago: * {} {}'.format(text, reltime, text, last_seen[2][8:-1])
+        reltime = timeformat.time_since(last_seen.time)
+        if last_seen.quote[0:1] == "\x01":
+            return '{} was last seen {} ago: * {} {}'.format(text, reltime, text, last_seen.quote[8:-1])
         else:
-            return '{} was last seen {} ago saying: {}'.format(text, reltime, last_seen[2])
+            return '{} was last seen {} ago saying: {}'.format(text, reltime, last_seen.quote)
     else:
         return "I've never seen {} talking in this channel.".format(text)

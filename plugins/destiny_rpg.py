@@ -1,3 +1,4 @@
+import asyncio
 import random
 from cloudbot import hook
 from operator import itemgetter
@@ -73,7 +74,7 @@ def generate_event():
 
 
 @hook.on_start()
-def load_cache(bot):
+async def load_cache(bot):
     """Load in/create our database, tables, and query objects."""
     global GAME, PLAYERS, GAME_Q, PLAYER_Q
     db = TinyDB('destiny_rpg.json')
@@ -84,7 +85,7 @@ def load_cache(bot):
 
 
 @hook.command("startgame", autohelp=False, permissions=["op"])
-def start_game(bot, chan, message, conn):
+async def start_game(bot, chan, message, conn):
     """Start Destiny in your channel, to stop the game use .stopgame"""
     global GAME, GAME_Q
     if not chan.startswith("#"):
@@ -104,7 +105,7 @@ def start_game(bot, chan, message, conn):
 
 
 @hook.command("stopgame", autohelp=False, permissions=["op"])
-def stop_game(chan, conn):
+async def stop_game(chan, conn):
     """Stop Destiny in your channel. Scores will be preserved"""
     global GAME, GAME_Q
     curr_game = GAME.get(GAME_Q.channel == chan)
@@ -116,7 +117,7 @@ def stop_game(chan, conn):
 
 
 @hook.periodic(15, initial_interval=15)
-def spawn_event(message, bot):
+async def spawn_event(message, bot):
     global GAME, GAME_Q
     for curr_game in GAME.all():
         if not curr_game['game_on']:
@@ -137,7 +138,7 @@ def spawn_event(message, bot):
 
 
 @hook.command("bang", autohelp=False)
-def bang(nick, chan, message, conn, notice):
+async def bang(nick, chan, message, conn, notice):
     """When there is a target on the loose use this command to shoot it."""
     global GAME, PLAYERS, GAME_Q, PLAYER_Q
     out = ""
@@ -197,7 +198,7 @@ def bang(nick, chan, message, conn, notice):
 
 
 @hook.command("defend", autohelp=False)
-def defend(nick, chan, message, conn, notice):
+async def defend(nick, chan, message, conn, notice):
     """When there is a skiff or warsat, use defend to help defeat it."""
     global GAME, PLAYERS, GAME_Q, PLAYER_Q
     out = ""
@@ -255,7 +256,7 @@ def defend(nick, chan, message, conn, notice):
 
 
 @hook.command("assault", autohelp=False)
-def assault(nick, chan, message, conn, notice):
+async def assault(nick, chan, message, conn, notice):
     """When there is a high value target or walker, use assault to help defeat it."""
     global GAME, PLAYERS, GAME_Q, PLAYER_Q
     out = ""
@@ -312,7 +313,7 @@ def assault(nick, chan, message, conn, notice):
 
 
 @hook.command("leaders", autohelp=False)
-def leaders(text, chan, conn, db):
+async def leaders(text, chan, conn, db):
     """Print a list of the top event leaders in the channel."""
     p_list = {}
     for player in PLAYERS.all():
@@ -326,7 +327,7 @@ def leaders(text, chan, conn, db):
 
 
 @hook.command("events", autohelp=False)
-def events_stats(text, nick, chan, conn, message):
+async def events_stats(text, nick, chan, conn, message):
     """Print a user's events stats."""
     name = nick
     if text:

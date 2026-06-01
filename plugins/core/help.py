@@ -8,8 +8,7 @@ from cloudbot.util import formatting
 
 
 @hook.command("help", autohelp=False)
-@asyncio.coroutine
-def help_command(text, chan, conn, bot, notice, message, has_permission, triggered_prefix):
+async def help_command(text, chan, conn, bot, notice, message, has_permission, triggered_prefix):
     """[command] - gives help for [command], or lists all available commands if no command is specified
     :type text: str
     :type conn: cloudbot.client.Client
@@ -75,8 +74,7 @@ def help_command(text, chan, conn, bot, notice, message, has_permission, trigger
 
 
 @hook.command
-@asyncio.coroutine
-def cmdinfo(text, bot, notice):
+async def cmdinfo(text, bot, notice):
     """<command> - Gets various information about a command"""
     cmd = text.split()[0].lower().strip()
 

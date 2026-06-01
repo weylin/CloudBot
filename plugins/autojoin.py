@@ -33,12 +33,11 @@ def load_cache(db):
 
 
 @hook.irc_raw('376')
-@asyncio.coroutine
-def do_joins(conn):
+async def do_joins(conn):
     join_throttle = conn.config.get("join_throttle", 0.4)
     for chan in chan_cache[conn.name]:
         conn.join(chan)
-        yield from asyncio.sleep(join_throttle)
+        await asyncio.sleep(join_throttle)
 
 
 @hook.irc_raw('JOIN', singlethread=True)

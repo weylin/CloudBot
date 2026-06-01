@@ -1,10 +1,12 @@
+import asyncio
 import datetime
+import functools
 import json
+import requests
 from cloudbot import hook
 from cloudbot.event import EventType
 from html.parser import HTMLParser
 from random import choice, sample
-from requests import get
 from pickle import dump, load
 from feedparser import parse
 from cloudbot.util.web import try_shorten
@@ -41,6 +43,7 @@ PVE_OPTS = ['activitiesEntered', 'activitiesCleared', 'avgKillDistance',
 
 class MLStripper(HTMLParser):
     def __init__(self):
+        super().__init__()
         self.reset()
         self.strict = False
         self.convert_charrefs= True
@@ -67,7 +70,7 @@ def string_to_datetime(datetime_as_string):
 def datetime_to_string(datetime_object):
     return datetime.datetime.strftime(datetime_object,'%Y-%m-%dT%H:%M:%SZ')
 
-def get_advisors(text=''):
+async def get_advisors(loop, text=''):
     if text.lower() in ['clear', 'purge', 'flush', 'new', 'refresh']:
         del CACHE['advisors']
     if 'advisors' in CACHE and str(datetime.datetime.utcnow()) > CACHE['advisors']['activities']['weeklycrucible']['status']['expirationDate']:
@@ -75,12 +78,13 @@ def get_advisors(text=''):
         del CACHE['advisors']
     if 'advisors' not in CACHE:
         try:
-            CACHE['advisors'] = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
+            r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/V2/?definitions=true'.format(BASE_URL), headers=HEADERS))
+            CACHE['advisors'] = r.json()['Response']['data']
         except: 
             return 'Error: unable to get Advisors'
     return CACHE['advisors']
 
-def get_user(user_name, console=None):
+async def get_user(loop, user_name, console=None):
     '''
     Takes in a username and returns a dictionary of all systems they are
     on as well as their associated id for that system, plus general information
@@ -95,15 +99,13 @@ def get_user(user_name, console=None):
             gamertag = platforms[platform]
             try:
                 # Get the Destiny membership ID
-                searchResults = get('{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag),
-                    headers=HEADERS).json()['Response'][0]
+                r = await loop.run_in_executor(None, functools.partial(requests.get, '{}SearchDestinyPlayer/{}/{}/'.format(BASE_URL, platform, gamertag), headers=HEADERS))
+                searchResults = r.json()['Response'][0]
                 membershipId = searchResults['membershipId']
                 displayName = searchResults['displayName']
                 # Then get Destiny summary
-                characterHash = get(
-                    '{}{}/Account/{}/Summary/'
-                    .format(BASE_URL, platform, membershipId),
-                    headers=HEADERS).json()['Response']['data']
+                r = await loop.run_in_executor(None, functools.partial(requests.get, '{}{}/Account/{}/Summary/'.format(BASE_URL, platform, membershipId), headers=HEADERS))
+                characterHash = r.json()['Response']['data']
             except:
                 return 'A user by the name {} was not found.'.format(gamertag)
 
@@ -126,12 +128,12 @@ def get_user(user_name, console=None):
         # CACHE[user_name] = user_info
         return user_info if user_info else 'A user by the name {} was not found.'.format(user_name)
 
-def prepare_lore_cache():
+async def prepare_lore_cache(loop):
     '''
    This function will allow us to do this: LORE_CACHE[name]['cardIntro']
    '''
-    lore_base = get('{}/Vanguard/Grimoire/Definition/'.format(BASE_URL),
-        headers=HEADERS).json()['Response']['themeCollection']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}/Vanguard/Grimoire/Definition/'.format(BASE_URL), headers=HEADERS))
+    lore_base = r.json()['Response']['themeCollection']
 
     global LORE_CACHE
     LORE_CACHE = {}
@@ -229,7 +231,7 @@ def coo_t3(when):
     return bosses[ ((when - datetime.date(2015,9,15)).days // 7) % 3 ]
 
 @hook.on_start()
-def load_cache(bot):
+async def load_cache(bot):
     '''Load in our pickle cache and the Headers'''
     global HEADERS
     HEADERS = {'X-API-Key': bot.config.get('api_keys', {}).get('destiny', None)}
@@ -257,12 +259,12 @@ def load_cache(bot):
         LORE_CACHE = {}
 
 @hook.event([EventType.message, EventType.action], singlethread=True)
-def discord_tracker(event, db, conn):
+async def discord_tracker(event, db, conn):
     if event.nick == 'DTG' and 'Command sent from Discord by' in event.content:
         global DISCORD_USER
         DISCORD_USER = event.content[event.content.find("by") + 3: -1]
 
-def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, notice):
+async def compile_stats(text, nick, bot, loop, opts, defaults, split_defaults, st_type, notice):
     if not text:
         text = nick
     text = text.split(' ')
@@ -273,7 +275,7 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
         notice('options: {}'.format(', '.join(opts + WEAPON_TYPES)))
         return
 
-    target = compile_stats_arg_parse(text, nick)
+    target = await compile_stats_arg_parse(text, nick, loop)
 
     if target['user'] is None or not target['nick']:
         return "No possible user found."
@@ -294,11 +296,8 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
 
         # Get stats
         try:
-            data = get(
-                '{}Stats/Account/{}/{}/'.format(
-                    BASE_URL, console, membership[console]['membershipId']),
-                headers=HEADERS
-            ).json()['Response'][path]
+            r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Stats/Account/{}/{}/'.format(BASE_URL, console, membership[console]['membershipId']), headers=HEADERS))
+            data = r.json()['Response'][path]
         except KeyError:
             return 'Shit\'s broke'
         tmp_out = []
@@ -320,7 +319,7 @@ def compile_stats(text, nick, bot, opts, defaults, split_defaults, st_type, noti
         output.append('{}: {}'.format(CONSOLES[console - 1], ', '.join(tmp_out)))
     return '\x02{0}\x02: {1}'.format(target['nick'], '; '.join(output))
 
-def compile_stats_arg_parse(text_arr, given_nick):
+async def compile_stats_arg_parse(text_arr, given_nick, loop):
     '''Parse the input
 
     :param textArr: the input text array to parse
@@ -348,11 +347,11 @@ def compile_stats_arg_parse(text_arr, given_nick):
             console = CONSOLES[check_arg]
             if user:
                 # better run it again
-                user = get_user(nick, CONSOLE2ID[console])
+                user = await get_user(loop, nick, CONSOLE2ID[console])
             elif collect:
                 # gamertag may have been given, try it
                 for i, arg in enumerate(collect):
-                    user = get_user(arg, CONSOLE2ID[console])
+                    user = await get_user(loop, arg, CONSOLE2ID[console])
                     if not isinstance(user, str):
                         # Gamertag given, found, remove it.
                         collect.pop(i)
@@ -363,10 +362,10 @@ def compile_stats_arg_parse(text_arr, given_nick):
         elif not nick:
             if console:
                 # perfect, we can just return the user for it
-                t = get_user(check_arg, CONSOLE2ID[console])
+                t = await get_user(loop, check_arg, CONSOLE2ID[console])
             else:
                 # not perfect, but give it a shot
-                t = get_user(check_arg)
+                t = await get_user(loop, check_arg)
 
             if not isinstance(t, str):
                 # XXX: Right now, the only string returned is "A user by
@@ -384,7 +383,7 @@ def compile_stats_arg_parse(text_arr, given_nick):
 
     # If we didn't get a nick, assume the requester.
     if not nick:
-        user = get_user(given_nick, CONSOLE2ID[console]) if console else get_user(given_nick)
+        user = await get_user(loop, given_nick, CONSOLE2ID[console]) if console else await get_user(loop, given_nick)
         if not isinstance(user, str):
            nick = given_nick
         else:
@@ -395,16 +394,17 @@ def compile_stats_arg_parse(text_arr, given_nick):
 
 
 @hook.command('pvp')
-def pvp(text, nick, bot, notice):
+async def pvp(text, nick, bot, loop, notice):
     if nick == 'DTG':
         nick = DISCORD_USER
     defaults = ['k/d', 'k/h', 'd/h', 'kills', 'bestSingleGameKills',
         'longestKillSpree', 'bestWeapon', 'secondsPlayed']
     split_defaults = ['k/d']
-    return compile_stats(
+    return await compile_stats(
         text=text,
         nick=nick,
         bot=bot,
+        loop=loop,
         opts=PVP_OPTS,
         defaults=defaults,
         split_defaults=split_defaults,
@@ -413,16 +413,17 @@ def pvp(text, nick, bot, notice):
     )
 
 @hook.command('pve')
-def pve(text, nick, bot, notice):
+async def pve(text, nick, bot, loop, notice):
     if nick == 'DTG':
         nick = DISCORD_USER
     defaults = ['k/h', 'kills', 'activitiesCleared', 'longestKillSpree',
         'bestWeapon', 'secondsPlayed']
     split_defaults = ['k/d']
-    return compile_stats(
+    return await compile_stats(
         text=text,
         nick=nick,
         bot=bot,
+        loop=loop,
         opts=PVE_OPTS,
         defaults=defaults,
         split_defaults=split_defaults,
@@ -431,7 +432,7 @@ def pve(text, nick, bot, notice):
     )
 
 @hook.command('save')
-def save_cache():
+async def save_cache():
     output = 'Neither cache saved'
     with open('destiny_cache', 'wb') as f:
         dump(CACHE, f)
@@ -443,7 +444,7 @@ def save_cache():
 
 
 @hook.command('item')
-def item_search(text, bot):
+async def item_search(text, bot, loop):
     '''
     Expects the tex to be a valid object in the Destiny database
     Returns the item's name and description.
@@ -451,14 +452,14 @@ def item_search(text, bot):
     '''
     item = text.strip()
     itemquery = '{}Explorer/Items?name={}'.format(BASE_URL, item)
-    itemHash = get(
-        itemquery, headers=HEADERS).json()['Response']['data']['itemHashes']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, itemquery, headers=HEADERS))
+    itemHash = r.json()['Response']['data']['itemHashes']
 
     output = []
     for item in itemHash:
         itemquery = '{}Manifest/inventoryItem/{}'.format(BASE_URL, item)
-        result = get(
-            itemquery, headers=HEADERS).json()['Response']['data']['inventoryItem']
+        r = await loop.run_in_executor(None, functools.partial(requests.get, itemquery, headers=HEADERS))
+        result = r.json()['Response']['data']['inventoryItem']
 
         output.append('\x02{}\x02 ({} {}{}) - \x1D{}\x1D - http://www.destinydb.com/items/{}'.format(
             result['itemName'],
@@ -471,7 +472,7 @@ def item_search(text, bot):
     return output[:3]
 
 @hook.command('trials')
-def trials(text,bot):
+async def trials(text, bot, loop):
     if 'flush' in text.lower(): CACHE['trials'] = {}
     if 'last' in text.lower():
         try:
@@ -496,12 +497,14 @@ def trials(text,bot):
                 if s: output.append('{} seconds'.format(s))
                 return '\x02Trials of Osiris will return in\x02 {}'.format(', '.join(output))
 
-    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['trials']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/V2/?definitions=true'.format(BASE_URL), headers=HEADERS))
+    advisors = r.json()['Response']['data']['activities']['trials']
     if advisors['status']['active'] == False:
         CACHE['trials'] = { 'expiration': datetime_to_string(string_to_datetime(advisors['status']['startDate']) - datetime.timedelta(days=14)), 'nextStart': advisors['status']['startDate'], 'output': '\x02Trials of Osiris:\x02 Unavailable.'  }
-        return trials('','')
+        return await trials('', '', loop)
 
-    trials_map = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']['activityName']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/1/{}/'.format(BASE_URL,advisors['display']['activityHash']), headers=HEADERS))
+    trials_map = r.json()['Response']['data']['activity']['activityName']
     new_trials= { 'expiration': advisors['status']['expirationDate'], 'nextStart': datetime_to_string(string_to_datetime(advisors['status']['startDate']) + datetime.timedelta(days=7)), 'output': '\x02Trials of Osiris:\x02 {}'.format(trials_map) }
 
     if 'trials' in CACHE and new_trials != CACHE['trials']:
@@ -510,7 +513,7 @@ def trials(text,bot):
     return new_trials['output']
 
 @hook.command('daily')
-def daily(text,bot):
+async def daily(text, bot, loop):
     if 'last' in text.lower():
         try:
             return CACHE['last_daily']['output']
@@ -520,9 +523,12 @@ def daily(text,bot):
     if 'daily' in CACHE and datetime.datetime.utcnow() < datetime.datetime.strptime(CACHE['daily']['expiration'],'%Y-%m-%dT%H:%M:%SZ'):
         return CACHE['daily']['output']
 
-    advisors = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']
-    dailycrucible = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailycrucible']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
-    dailychapter = get('{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailychapter']['display']['activityHash']),headers=HEADERS).json()['Response']['data']['activity']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/V2/?definitions=true'.format(BASE_URL), headers=HEADERS))
+    advisors = r.json()['Response']['data']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailycrucible']['display']['activityHash']), headers=HEADERS))
+    dailycrucible = r.json()['Response']['data']['activity']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['dailychapter']['display']['activityHash']), headers=HEADERS))
+    dailychapter = r.json()['Response']['data']['activity']
     new_daily = { 'expiration': advisors['activities']['dailycrucible']['status']['expirationDate'], 'output': '\x02Daily activities:\x02 {} || {}: {}'.format(dailycrucible['activityName'],dailychapter['activityName'],dailychapter['activityDescription']) }
 
     if 'daily' in CACHE and new_daily != CACHE['daily']:
@@ -531,7 +537,7 @@ def daily(text,bot):
     return new_daily['output']
 
 @hook.command('weekly')
-def weekly(text,bot):
+async def weekly(text, bot, loop):
     
     if 'last' in text.lower():
         try:
@@ -539,7 +545,7 @@ def weekly(text,bot):
         except KeyError:
             return 'Unavailable.'
 
-    advisors = get_advisors(text) 
+    advisors = await get_advisors(loop, text) 
     if type(advisors) is str: return advisors
     
     weeklyfeaturedraid_challenges = []
@@ -547,15 +553,13 @@ def weekly(text,bot):
         if 'Challenge' in skull['displayName']:
             weeklyfeaturedraid_challenges.append(skull['displayName'])
 
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/1/{}/'.format(BASE_URL, advisors['activities']['weeklyfeaturedraid']['display']['activityHash']), headers=HEADERS))
     weeklyfeaturedraid = '{}: {}'.format(
-        get('{}Manifest/1/{}/'.format(BASE_URL,
-            advisors['activities']['weeklyfeaturedraid']['display']['activityHash']),
-            headers=HEADERS).json()['Response']['data']['activity']['activityName'],
+        r.json()['Response']['data']['activity']['activityName'],
          ', '.join(weeklyfeaturedraid_challenges))
 
-    weeklycrucible = get('{}Manifest/1/{}/'.format(
-        BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']),
-        headers=HEADERS).json()['Response']['data']['activity']['activityName']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/1/{}/'.format(BASE_URL,advisors['activities']['weeklycrucible']['display']['activityHash']), headers=HEADERS))
+    weeklycrucible = r.json()['Response']['data']['activity']['activityName']
 
     heroicstrike = []
     for skullCategory in advisors['activities']['heroicstrike']['extended']['skullCategories']:
@@ -583,16 +587,15 @@ def weekly(text,bot):
     return new_weekly['output']
 
 @hook.command('nightfall', 'nf')
-def nightfall(text, bot):
+async def nightfall(text, bot, loop):
     if CACHE.get('nightfall', None) and not text.lower() == 'flush':
         if 'last' in text.lower():
             return CACHE.get('last_nightfall', 'Unavailable')
         else:
             return CACHE['nightfall']
     else:
-        advisors = get(
-            '{}advisors/?definitions=true'.format(BASE_URL),
-            headers=HEADERS).json()#['Response']['data']['nightfall']
+        r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/?definitions=true'.format(BASE_URL), headers=HEADERS))
+        advisors = r.json()#['Response']['data']['nightfall']
         nightfallId = advisors['Response']['data']['nightfall']['specificActivityHash']
         nightfallActivityBundleHashId = advisors['Response']['data']['nightfall']['activityBundleHash']
 
@@ -610,14 +613,15 @@ def nightfall(text, bot):
         return output
 
 @hook.command('coe')
-def coe(text,bot):
+async def coe(text, bot, loop):
     if CACHE.get('coe', None) and text.lower() not in ['flush', 'clear', 'purge']:
         if 'last' in text.lower():
             return CACHE.get('last_coe', 'Unavailable')
         else:
             return CACHE['coe']
     else:
-        advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),headers=HEADERS).json()['Response']['data']['activities']['elderchallenge']
+        r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/V2/?definitions=true'.format(BASE_URL), headers=HEADERS))
+        advisor = r.json()['Response']['data']['activities']['elderchallenge']
         modifiers = []
         for skullCategory in advisor['extended']['skullCategories']:
             for skull in skullCategory['skulls']:
@@ -632,7 +636,7 @@ def coe(text,bot):
         return output
 
 @hook.command('xur')
-def xur(text, bot):
+async def xur(text, bot, loop):
     if 'last' in text.lower():
         return CACHE.get('last_xur', 'Unavailable')
 
@@ -666,9 +670,8 @@ def xur(text, bot):
     if CACHE.get('xur', None) and not text.lower() == 'flush':
         return CACHE['xur']
 
-    xurStock = get(
-        '{}Advisors/Xur/?definitions=true'.format(BASE_URL),
-        headers=HEADERS).json()['Response']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Advisors/Xur/?definitions=true'.format(BASE_URL), headers=HEADERS))
+    xurStock = r.json()['Response']
 
     items = [i['item'] for i in xurStock['data']['saleItemCategories'][2]['saleItems']]
     definitions = xurStock['definitions']['items']
@@ -692,7 +695,7 @@ def xur(text, bot):
     return output
 
 @hook.command('armsday')
-def armsday(text, bot):
+async def armsday(text, bot, loop):
     if 'last' in text.lower():
         return CACHE.get('last_armsday', 'Unavailable')
 
@@ -725,14 +728,14 @@ def armsday(text, bot):
     if CACHE.get('armsday', None) and text.lower() not in ['flush', 'clear', 'purge']:
         return CACHE['armsday']
 
-    advisor = get('{}advisors/V2/?definitions=true'.format(BASE_URL),
-        headers=HEADERS).json()['Response']['data']['activities']['armsday']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}advisors/V2/?definitions=true'.format(BASE_URL), headers=HEADERS))
+    advisor = r.json()['Response']['data']['activities']['armsday']
     armsday_orders = []
     for order in advisor['extended']['orders']:
         armsday_orders.append(order['item']['itemHash'])
     for order in armsday_orders:
-        armsday_orders[armsday_orders.index(order)] = get('{}Manifest/inventoryItem/{}'.format(
-            BASE_URL, order),headers=HEADERS).json()['Response']['data']['inventoryItem']['itemName']
+        r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/inventoryItem/{}'.format(BASE_URL, order), headers=HEADERS))
+        armsday_orders[armsday_orders.index(order)] = r.json()['Response']['data']['inventoryItem']['itemName']
     output = '\x02Armsday orders available:\x02 {}'.format(', '.join(armsday_orders))
 
     if output != CACHE.get('armsday', output):
@@ -742,9 +745,9 @@ def armsday(text, bot):
 
 
 @hook.command('lore')
-def lore(text, bot, notice):
+async def lore(text, bot, loop, notice):
     if not LORE_CACHE or text.lower() == 'flush':  # if the cache doesn't exist, create it
-        prepare_lore_cache()
+        await prepare_lore_cache(loop)
         text = ''
     complete = False
     if 'complete' in text:
@@ -791,26 +794,26 @@ def lore(text, bot, notice):
         output = '{}... Read more at http://www.destinydb.com/grimoire/{}'.format(
             output[:301], contents['cardId'])
 
-    return output if len(output) > 5 else lore('', bot, notice)
+    return output if len(output) > 5 else await lore('', bot, loop, notice)
 
 @hook.command('collection')
-def collection(text, nick, bot):
+async def collection(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
-            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+            membership = await get_user(loop, ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 1)
             links = { 1: membership[1]['displayName']}
         elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']:
-            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+            membership = await get_user(loop, ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 2)
             links = { 2: membership[2]['displayName']}
         else:
-            membership = get_user(text)
+            membership = await get_user(loop, text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
             links = CACHE['links'].get(text)
     else:
-        membership = get_user(nick)
+        membership = await get_user(loop, nick)
         links = CACHE['links'].get(nick)
 
     if type(membership) == str: return membership
@@ -818,11 +821,8 @@ def collection(text, nick, bot):
     output = []
 
     for console in membership:
-        grimoire = get(
-            '{}Vanguard/Grimoire/{}/{}/'
-            .format(BASE_URL, console, membership[console]['membershipId']),
-            headers=HEADERS
-        ).json()['Response']['data']
+        r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Vanguard/Grimoire/{}/{}/'.format(BASE_URL, console, membership[console]['membershipId']), headers=HEADERS))
+        grimoire = r.json()['Response']['data']
         found_frags = []
         found_siva = []
         ghosts = 0
@@ -830,7 +830,7 @@ def collection(text, nick, bot):
             if 'fragments' not in CACHE['collections']:
                 # XXX: don't allow !collections to be broken
                 # because of bad cache
-                prepare_lore_cache()
+                await prepare_lore_cache(loop)
             if card['cardId'] in CACHE['collections']['fragments']:
                 found_frags.append([card['cardId']])
             elif card['cardId'] == 103094:
@@ -861,7 +861,7 @@ def collection(text, nick, bot):
     return output
 
 @hook.command('link')
-def link(text, nick, bot, notice):
+async def link(text, nick, bot, notice):
     if nick == 'DTG':
         nick = DISCORD_USER
     text = text.lower().split(' ')
@@ -905,7 +905,7 @@ def link(text, nick, bot, notice):
         return
 
 @hook.command('migrate')
-def migrate(text, nick, bot):
+async def migrate(text, nick, bot):
     if nick in ['weylin', 'avcables', 'DoctorRaptorMD[XB1]', 'tuzonghua']:
         global CACHE
         CACHE = {'links': CACHE['links']}
@@ -914,10 +914,10 @@ def migrate(text, nick, bot):
         return 'Your light is not strong enough.'
 
 @hook.command('purge')
-def purge(text, nick, bot):
+async def purge(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
-    membership = get_user(nick)
+    membership = await get_user(loop, nick)
 
     if type(membership) is not dict:
         return membership
@@ -941,11 +941,11 @@ def purge(text, nick, bot):
         return 'Bro, do you even purge?!'
 
 @hook.command('profile')
-def profile(text, nick, bot):
+async def profile(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
     text = nick if not text else text
-    membership = get_user(text)
+    membership = await get_user(loop, text)
     if type(membership) is not dict:
         return membership
 
@@ -958,23 +958,23 @@ def profile(text, nick, bot):
     else:
         return 'No profile!'
 
-    bungieUserId = get(
-        'http://www.bungie.net/Platform/User/GetBungieAccount/{}/{}/'.format(membershipId, platform),
-        headers=HEADERS).json()['Response']['bungieNetUser']['membershipId']
+    r = await loop.run_in_executor(None, functools.partial(requests.get, 'http://www.bungie.net/Platform/User/GetBungieAccount/{}/{}/'.format(membershipId, platform), headers=HEADERS))
+    bungieUserId = r.json()['Response']['bungieNetUser']['membershipId']
 
     return 'https://www.bungie.net/en/Profile/254/{}'.format(bungieUserId)
 
 @hook.command('chars')
-def chars(text, nick, bot, notice):
+async def chars(text, nick, bot, loop, notice):
     if nick == 'DTG':
         nick = DISCORD_USER
     text = nick if not text else text
-    text = text.split(' ')
+    if isinstance(text, str):
+        text = text.split(' ')
     CONSOLE2ID = {"xbox": 1, "playstation": 2}
 
     err_msg = 'Invalid use of chars command. Use: !chars <nick> or !chars <gamertag> <psn/xbl>'
 
-    target = compile_stats_arg_parse(text, nick)
+    target = await compile_stats_arg_parse(text, nick, loop)
     if target['stats'] or target['split']:
         return err_msg
 
@@ -1007,7 +1007,7 @@ def chars(text, nick, bot, notice):
     return "\x02{0}\x02: {1}".format(target['nick'], ' ; '.join(output))
 
 @hook.command('triumphs')
-def triumphs(text,nick,bot):
+async def triumphs(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
     Y2_MOT_HASH = {
@@ -1027,17 +1027,16 @@ def triumphs(text,nick,bot):
             return 'When using gamertag you must also supply platform'
         if platform in ['psn','ps','playstation','ps4']: platform = 2
         if platform in ['xb1','xb','xbl','xbox']: platform = 1
-        membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),platform)
+        membership = await get_user(loop, ' '.join(text.split(' ')[0:len(text.split(' '))-1]), platform)
     else:
-        membership = get_user(nick)
+        membership = await get_user(loop, nick)
     if type(membership) == str: return membership
     for platform in [1,2]:
         if platform in membership:
             missing = []
             output.append(CONSOLES[platform - 1] + ':')
-            book = get('{}{}/Account/{}/Advisors/?definitions=true'.format(
-                BASE_URL,platform,membership[platform]['membershipId']),
-                headers=HEADERS).json()['Response']['data']['recordBooks']['2175864601']
+            r = await loop.run_in_executor(None, functools.partial(requests.get, '{}{}/Account/{}/Advisors/?definitions=true'.format(BASE_URL,platform,membership[platform]['membershipId']), headers=HEADERS))
+            book = r.json()['Response']['data']['recordBooks']['2175864601']
             for hash in Y2_MOT_HASH:
                 if book['records'][hash]['objectives'][0]['isComplete'] == False:
                     missing.append(Y2_MOT_HASH[hash])
@@ -1047,24 +1046,24 @@ def triumphs(text,nick,bot):
 
 
 @hook.command('wasted')
-def wasted(text,nick,bot):
+async def wasted(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
-            membership = get_user(
-                ' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+            membership = await get_user(loop, 
+                ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 1)
         elif text.split(
             ' ').pop().lower() in ['psn','ps','playstation','ps4']:
-            membership = get_user(
-                ' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+            membership = await get_user(loop, 
+                ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 2)
         else:
-            membership = get_user(text)
+            membership = await get_user(loop, text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. \
                 Try specifying platform: psn or xbl'.format(text)
     else:
-        membership = get_user(nick)
+        membership = await get_user(loop, nick)
 
     if type(membership) == str:
         return membership
@@ -1083,10 +1082,8 @@ def wasted(text,nick,bot):
             to make output easier to read and format. I'm not sure my names are
             correct for the actual color being displayed though. """
 
-            waste = get(
-                'https://www.wastedondestiny.com/api/?console={}&user={}'.format(
-                    platform[0], displayname))
-            data = waste.json()  # Convert our get to json formatted data.
+            r = await loop.run_in_executor(None, functools.partial(requests.get, 'https://www.wastedondestiny.com/api/?console={}&user={}'.format(platform[0], displayname)))
+            data = r.json()  # Convert our get to json formatted data.
 
             if data['Response'][platform[1]]:
                 timePlayed = (data['Response'][platform[1]].get('timePlayed', 0))
@@ -1102,20 +1099,20 @@ def wasted(text,nick,bot):
 
 
 @hook.command('lastpvp')
-def lastpvp(text,nick,bot):
+async def lastpvp(text, nick, bot, loop):
     if nick == 'DTG':
         nick = DISCORD_USER
     if text:
         if text.split(' ').pop().lower() in ['xb1','xb','xbl','xbox']:
-            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),1)
+            membership = await get_user(loop, ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 1)
         elif text.split(' ').pop().lower() in ['psn','ps','playstation','ps4']:
-            membership = get_user(' '.join(text.split(' ')[0:len(text.split(' '))-1]),2)
+            membership = await get_user(loop, ' '.join(text.split(' ')[0:len(text.split(' '))-1]), 2)
         else:
-            membership = get_user(text)
+            membership = await get_user(loop, text)
             if type(membership) == str:
                 return 'A user by the name of {} was not found. Try specifying platform: psn or xbl'.format(text)
     else:
-        membership = get_user(nick)
+        membership = await get_user(loop, nick)
 
     if type(membership) == str: return membership
 
@@ -1126,27 +1123,26 @@ def lastpvp(text,nick,bot):
             activity = {}
             for character in membership[platform]['characters']:
                 try:
-                    x = get('{}Stats/ActivityHistory/{}/{}/{}/?mode=5'.format(
-                        BASE_URL, platform, membership[platform]['membershipId'], character),
-                        headers=HEADERS).json()['Response']['data']['activities'][0]
+                    r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Stats/ActivityHistory/{}/{}/{}/?mode=5'.format(BASE_URL, platform, membership[platform]['membershipId'], character), headers=HEADERS))
+                    x = r.json()['Response']['data']['activities'][0]
                     if activity == {}: activity = x; char = character
                     if 'period' in activity and x['period'] > activity['period']: activity = x; char = character
                 except:
                     pass
             output.append( '(' + CONSOLES[platform-1] + ')')
+            
+            r = await loop.run_in_executor(None, functools.partial(requests.get, '{}Manifest/2/{}/'.format(BASE_URL, activity['activityDetails']['activityTypeHashOverride']), headers=HEADERS))
+            activity_type_name = r.json()['Response']['data']['activityType']['activityTypeName']
+            
             if activity['values']['standing']['basic']['displayValue'] in ['Victory','1','2','3']:
                 output.append(
                     '\x02\x033\u2713 ' +
-                    get('{}Manifest/2/{}/'.format(
-                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
-                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  +
+                    activity_type_name +
                     '\x03\x02:')
             else:
                 output.append(
                     '\x02\x034\u2717 ' +
-                    get('{}Manifest/2/{}/'.format(
-                        BASE_URL, activity['activityDetails']['activityTypeHashOverride']),
-                        headers=HEADERS).json()['Response']['data']['activityType']['activityTypeName']  +
+                    activity_type_name +
                     '\x03\x02:')
             output.append(
                 ', '.join([
@@ -1155,8 +1151,9 @@ def lastpvp(text,nick,bot):
                         'Deaths: ' + activity['values']['deaths']['basic']['displayValue'],
                         '(' + activity['values']['killsDeathsRatio']['basic']['displayValue'] + ')']))
             output.append( 'http://guardian.gg/en/pgcr/' + activity['activityDetails']['instanceId'])
-            pgcr = get('{}/Stats/PostGameCarnageReport/{}/'.format(
-                BASE_URL,activity['activityDetails']['instanceId']),headers=HEADERS).json()['Response']['data']
+            
+            r = await loop.run_in_executor(None, functools.partial(requests.get, '{}/Stats/PostGameCarnageReport/{}/'.format(BASE_URL,activity['activityDetails']['instanceId']), headers=HEADERS))
+            pgcr = r.json()['Response']['data']
             for entry in pgcr['entries']:
                 if entry['characterId'] == char:
                     if 'extended' in entry:
@@ -1185,16 +1182,16 @@ def lastpvp(text,nick,bot):
     return " ".join(output)
 
 @hook.command('coo')
-def coo(bot):
+async def coo(bot):
     return 'Court of Oryx Tier 3 Boss: ' + coo_t3(datetime.date.today())
 
 @hook.command('rules')
-def rules(bot):
+async def rules(bot):
     return 'Check \'em! https://www.reddit.com/r/DestinyTheGame/wiki/irc'
 
 @hook.command('news')
-def news(bot):
-    feed = parse('https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1')
+async def news(bot, loop):
+    feed = await loop.run_in_executor(None, functools.partial(parse, 'https://www.bungie.net/en/Rss/NewsByCategory?category=destiny&currentpage=1&itemsPerPage=1'))
     if not feed.entries:
         return 'Feed not found.'
 

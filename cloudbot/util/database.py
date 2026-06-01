@@ -2,6 +2,35 @@
 database - contains variables set by cloudbot to be easily access
 """
 
-# this is assigned in the CloudBot so that its recreated when the bot restarts
-metadata = None
-base = None
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    close_all_sessions,
+    scoped_session,
+    sessionmaker,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy import MetaData
+    from sqlalchemy.engine import Engine
+
+__all__ = ("metadata", "base", "Base", "Session", "configure")
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+base = Base
+
+metadata: MetaData = Base.metadata
+Session = scoped_session(sessionmaker(future=True))
+
+
+def configure(bind: Engine | None = None) -> None:
+    close_all_sessions()
+    Session.remove()
+    Session.configure(bind=bind)
