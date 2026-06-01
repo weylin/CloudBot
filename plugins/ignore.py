@@ -26,9 +26,9 @@ def load_cache(db):
     global ignore_cache
     ignore_cache = []
     for row in db.execute(table.select()):
-        conn = row["connection"]
-        chan = row["channel"]
-        mask = row["mask"]
+        conn = row.connection
+        chan = row.channel
+        mask = row.mask
         ignore_cache.append((conn, chan, mask))
 
 
@@ -67,8 +67,7 @@ def is_ignored(conn, chan, mask):
 
 # noinspection PyUnusedLocal
 @hook.sieve(priority=50)
-@asyncio.coroutine
-def ignore_sieve(bot, event, _hook):
+async def ignore_sieve(bot, event, _hook):
     """
     :type bot: cloudbot.bot.CloudBot
     :type event: cloudbot.event.Event

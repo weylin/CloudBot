@@ -1,8 +1,6 @@
-import asyncio
 import itertools
-from operator import attrgetter
 
-from sqlalchemy import Table, Column, String, Boolean, PrimaryKeyConstraint
+from sqlalchemy import Boolean, Column, PrimaryKeyConstraint, String, Table
 
 from cloudbot import hook
 from cloudbot.event import CommandEvent
@@ -10,21 +8,24 @@ from cloudbot.util import database
 from cloudbot.util.formatting import chunk_str, pluralize_auto
 
 commands = Table(
-    'chain_commands',
+    "chain_commands",
     database.metadata,
-    Column('hook', String),
-    Column('allowed', Boolean, default=True),
-    PrimaryKeyConstraint('hook', 'allowed')
+    Column("hook", String),
+    Column("allowed", Boolean, default=True),
+    PrimaryKeyConstraint("hook", "allowed"),
 )
 
-allow_cache = {}
+allow_cache: dict[str, bool] = {}
 
 
-@hook.on_start
+@hook.on_start()
 def load_cache(db):
-    allow_cache.clear()
+    new_cache = {}
     for row in db.execute(commands.select()):
-        allow_cache[row["hook"]] = row["allowed"]
+        new_cache[row.hook] = row.allowed
+
+    allow_cache.clear()
+    allow_cache.update(new_cache)
 
 
 def format_hook_name(_hook):
@@ -33,7 +34,7 @@ def format_hook_name(_hook):
 
 def get_hook_from_command(bot, hook_name):
     manager = bot.plugin_manager
-    if '.' in hook_name:
+    if "." in hook_name:
         for _hook in manager.commands.values():
             if format_hook_name(_hook) == hook_name:
                 return _hook
@@ -55,65 +56,78 @@ def get_hook_from_command(bot, hook_name):
     return possible[0] if len(possible) == 1 else None
 
 
+def handle_chainallow_add(args, notice_doc, hook_name, db):
+    values = {"hook": hook_name}
+    if args:
+        allow = args.pop(0).lower()
+        if allow == "allow":
+            allow = True
+        elif allow == "deny":
+            allow = False
+        else:
+            return notice_doc()
+
+        values["allowed"] = allow
+
+    updated = True
+    res = db.execute(
+        commands.update().values(**values).where(commands.c.hook == hook_name)
+    )
+    if res.rowcount == 0:
+        updated = False
+        db.execute(commands.insert().values(**values))
+
+    db.commit()
+    load_cache(db)
+    if updated:
+        return "Updated state of '{}' in chainallow to allowed={}".format(
+            hook_name, allow_cache.get(hook_name)
+        )
+
+    if allow_cache.get(hook_name):
+        return f"Added '{hook_name}' as an allowed command"
+
+    return f"Added '{hook_name}' as a denied command"
+
+
+def handle_chainallow_del(args, notice_doc, hook_name, db):
+    res = db.execute(commands.delete().where(commands.c.hook == hook_name))
+    db.commit()
+    load_cache(db)
+    return "Deleted {}.".format(pluralize_auto(res.rowcount, "row"))
+
+
+chainallow_subcmds = {
+    "add": handle_chainallow_add,
+    "del": handle_chainallow_del,
+}
+
+
 @hook.command(permissions=["botcontrol", "snoonetstaff"])
 def chainallow(text, db, notice_doc, bot):
     """{add [hook] [{allow|deny}]|del [hook]} - Manage the allowed list fo comands for the chain command"""
     args = text.split()
     subcmd = args.pop(0).lower()
 
-    if not args:
+    if not args or subcmd not in chainallow_subcmds:
         return notice_doc()
 
     name = args.pop(0)
     _hook = get_hook_from_command(bot, name)
     if _hook is None:
-        return "Unable to find command '{}'".format(name)
+        return f"Unable to find command '{name}'"
 
     hook_name = format_hook_name(_hook)
 
-    if subcmd == "add":
-        values = {'hook': hook_name}
-        if args:
-            allow = args.pop(0).lower()
-            if allow == "allow":
-                allow = True
-            elif allow == "deny":
-                allow = False
-            else:
-                return notice_doc()
-
-            values['allowed'] = allow
-
-        updated = True
-        res = db.execute(commands.update().values(**values).where(commands.c.hook == hook_name))
-        if res.rowcount == 0:
-            updated = False
-            db.execute(commands.insert().values(**values))
-
-        db.commit()
-        load_cache(db)
-        if updated:
-            return "Updated state of '{}' in chainallow to allowed={}".format(hook_name, allow_cache.get(hook_name))
-
-        if allow_cache.get(hook_name):
-            return "Added '{}' as an allowed command".format(hook_name)
-
-        return "Added '{}' as a denied command".format(hook_name)
-    elif subcmd == "del":
-        res = db.execute(commands.delete().where(commands.c.hook == hook_name))
-        db.commit()
-        load_cache(db)
-        return "Deleted {}.".format(pluralize_auto(res.rowcount, "row"))
-    else:
-        return notice_doc()
+    return chainallow_subcmds[subcmd](args, notice_doc, hook_name, db)
 
 
 def parse_chain(text, bot):
-    parts = text.split('|')
+    parts = text.split("|")
     cmds = []
 
     for part in parts:
-        cmd, _, args = part.strip().partition(' ')
+        cmd, _, args = part.strip().partition(" ")
         _hook = get_hook_from_command(bot, cmd)
         cmds.append([cmd, _hook, args or ""])
 
@@ -126,28 +140,42 @@ def is_hook_allowed(_hook):
 
 
 def wrap_event(_hook, event, cmd, args):
-    cmd_event = CommandEvent(base_event=event, text=args.strip(), triggered_command=cmd, hook=_hook)
+    cmd_event = CommandEvent(
+        base_event=event,
+        text=args.strip(),
+        triggered_command=cmd,
+        hook=_hook,
+        cmd_prefix="",
+    )
     return cmd_event
 
 
-@hook.command
-@asyncio.coroutine
-def chain(text, bot, event):
-    """<cmd1> [args...] | <cmd2> [args...] | ... - Runs commands in a chain, piping the output from previous commands to tne next"""
+@hook.command()
+async def chain(text, bot, event):
+    """<cmd1> [args...] | <cmd2> [args...] | ... - Runs commands in a chain, piping the output from previous commands
+    to tne next"""
     cmds = parse_chain(text, bot)
 
     for name, _hook, _ in cmds:
         if _hook is None:
-            return "Unable to find command '{}'".format(name)
+            return f"Unable to find command '{name}'"
 
         if not is_hook_allowed(_hook):
-            event.notice("'{}' may not be used in command piping".format(format_hook_name(_hook)))
+            event.notice(
+                "'{}' may not be used in command piping".format(
+                    format_hook_name(_hook)
+                )
+            )
             return
 
         if _hook.permissions:
-            allowed = yield from event.check_permissions(_hook.permissions)
+            allowed = await event.check_permissions(_hook.permissions)
             if not allowed:
-                event.notice("Sorry, you are not allowed to use '{}'.".format(format_hook_name(_hook)))
+                event.notice(
+                    "Sorry, you are not allowed to use '{}'.".format(
+                        format_hook_name(_hook)
+                    )
+                )
                 return
 
     buffer = ""
@@ -175,11 +203,11 @@ def chain(text, bot, event):
 
         _target = target
 
-    def action(message, target=None):
+    def action(msg, target=None):
         nonlocal buffer
         nonlocal out_func
         nonlocal _target
-        buffer += (" " if buffer else "") + message
+        buffer += (" " if buffer else "") + msg
         if out_func is None:
             out_func = event.action
 
@@ -197,7 +225,7 @@ def chain(text, bot, event):
             cmd_event.notice_doc()
             return "Invalid syntax."
 
-        ok, res = yield from bot.plugin_manager.internal_launch(_hook, cmd_event)
+        ok, res = await bot.plugin_manager.internal_launch(_hook, cmd_event)
         if not ok:
             return "Error occurred."
 
@@ -215,10 +243,20 @@ def chain(text, bot, event):
 
 
 @hook.command(autohelp=False)
-def chainlist(notice, bot):
+def chainlist(bot, event):
     """- Returns the list of commands allowed in 'chain'"""
-    hooks = [get_hook_from_command(bot, name) for name, allowed in allow_cache.items() if allowed]
-    cmds = itertools.chain.from_iterable(map(attrgetter("aliases"), hooks))
-    cmds = sorted(cmds)
-    for part in chunk_str(", ".join(cmds)):
-        notice(part)
+    hooks = [
+        get_hook_from_command(bot, name)
+        for name, allowed in allow_cache.items()
+        if allowed
+    ]
+    s = ", ".join(
+        sorted(
+            itertools.chain.from_iterable(
+                h.aliases for h in hooks if h is not None
+            )
+        )
+    )
+
+    for part in chunk_str(s):
+        event.notice(part)

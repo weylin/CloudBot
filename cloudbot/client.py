@@ -2,56 +2,51 @@ import asyncio
 import collections
 import logging
 import random
+from typing import Any
 
 from cloudbot.permissions import PermissionManager
+from cloudbot.util import CLIENT_ATTR, async_util
 
 logger = logging.getLogger("cloudbot")
-
-CLIENTS = {}
 
 
 def client(_type):
     def _decorate(cls):
-        CLIENTS[_type] = cls
-        cls._type = _type
+        setattr(cls, CLIENT_ATTR, _type)
         return cls
 
-    return lambda cls: _decorate(cls)
+    return _decorate
+
+
+class ClientConnectError(Exception):
+    def __init__(self, client_name, server):
+        super().__init__(
+            "Unable to connect to client {} with server {}".format(
+                client_name, server
+            )
+        )
+        self.client_name = client_name
+        self.server = server
 
 
 class Client:
     """
     A Client representing each connection the bot makes to a single server
-    :type bot: cloudbot.bot.CloudBot
-    :type loop: asyncio.events.AbstractEventLoop
-    :type name: str
-    :type channels: list[str]
-    :type config: dict[str, unknown]
-    :type nick: str
-    :type vars: dict
-    :type history: dict[str, list[tuple]]
-    :type permissions: PermissionManager
     """
 
-    _type = None
-
-    def __init__(self, bot, name, nick, *, channels=None, config=None):
-        """
-        :type bot: cloudbot.bot.CloudBot
-        :type name: str
-        :type nick: str
-        :type channels: list[str]
-        :type config: dict[str, unknown]
-        """
+    def __init__(self, bot, _type, name, nick, *, channels=None, config=None):
         self.bot = bot
         self.loop = bot.loop
         self.name = name
         self.nick = nick
+        self._type = _type
+
+        self.channels = []
 
         if channels is None:
-            self.channels = []
+            self.config_channels = []
         else:
-            self.channels = channels
+            self.config_channels = channels
 
         if config is None:
             self.config = {}
@@ -64,44 +59,45 @@ class Client:
         self.permissions = PermissionManager(self)
 
         # for plugins to abuse
-        self.memory = collections.defaultdict()
+        self.memory: dict[str, Any] = collections.defaultdict()
 
         # set when on_load in core_misc is done
         self.ready = False
 
         self._active = False
 
+        self.cancelled_future = async_util.create_future(self.loop)
+
     def describe_server(self):
         raise NotImplementedError
 
-    @asyncio.coroutine
-    def auto_reconnect(self):
+    async def auto_reconnect(self):
         if not self._active:
             return
 
-        yield from self.try_connect()
+        await self.try_connect()
 
-    @asyncio.coroutine
-    def try_connect(self):
+    async def try_connect(self):
         timeout = 30
-        while not self.connected:
+        while self.active and not self.connected:
             try:
-                yield from self.connect(timeout)
+                await self.connect(timeout)
             except Exception:
-                logger.exception("[%s] Error occurred while connecting.", self.name)
+                logger.exception(
+                    "[%s] Error occurred while connecting.", self.name
+                )
             else:
                 break
 
-            yield from asyncio.sleep(random.randrange(timeout))
+            await asyncio.sleep(random.randrange(timeout))
 
-    @asyncio.coroutine
-    def connect(self, timeout=None):
+    async def connect(self, timeout=None):
         """
         Connects to the server, or reconnects if already connected.
         """
         raise NotImplementedError
 
-    def quit(self, reason=None):
+    def quit(self, reason=None, set_inactive=True):
         """
         Gracefully disconnects from the server with reason <reason>, close() should be called shortly after.
         """
@@ -116,53 +112,42 @@ class Client:
     def message(self, target, *text):
         """
         Sends a message to the given target
-        :type target: str
-        :type text: str
         """
         raise NotImplementedError
 
     def admin_log(self, text, console=True):
         """
         Log a message to the configured admin channel
-        :type text: str
-        :type console: bool
         """
         raise NotImplementedError
 
     def action(self, target, text):
         """
         Sends an action (or /me) to the given target channel
-        :type target: str
-        :type text: str
         """
         raise NotImplementedError
 
     def notice(self, target, text):
         """
         Sends a notice to the given target
-        :type target: str
-        :type text: str
         """
         raise NotImplementedError
 
     def set_nick(self, nick):
         """
         Sets the bot's nickname
-        :type nick: str
         """
         raise NotImplementedError
 
-    def join(self, channel):
+    def join(self, channel, key=None):
         """
         Joins a given channel
-        :type channel: str
         """
         raise NotImplementedError
 
     def part(self, channel):
         """
         Parts a given channel
-        :type channel: str
         """
         raise NotImplementedError
 
@@ -185,3 +170,10 @@ class Client:
     @property
     def active(self):
         return self._active
+
+    @active.setter
+    def active(self, value):
+        self._active = value
+
+    def reload(self):
+        self.permissions.reload()

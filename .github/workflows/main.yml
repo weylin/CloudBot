@@ -3,7 +3,7 @@ name: Deploy CloudBotIRC to Bots EC2 Instance.
 on:
   push:
     branches:
-      - master
+      - tnr-modernization
 
 jobs:
   deploy:

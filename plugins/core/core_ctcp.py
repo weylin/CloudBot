@@ -7,9 +7,8 @@ from cloudbot.event import EventType
 
 
 # CTCP responses
-@asyncio.coroutine
 @hook.event([EventType.other])
-def ctcp_version(notice, irc_ctcp_text):
+async def ctcp_version(notice, irc_ctcp_text):
     if irc_ctcp_text:
         if irc_ctcp_text.startswith("VERSION"):
             notice("\x01VERSION gonzobot a fork of Cloudbot {} - https://snoonet.org/gonzobot\x01".format(

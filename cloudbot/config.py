@@ -1,60 +1,66 @@
 import json
 import logging
-import os
 import sys
 import time
 from collections import OrderedDict
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, cast
+
+if TYPE_CHECKING:
+    from cloudbot.bot import AbstractBot
 
 logger = logging.getLogger("cloudbot")
 
 
 class Config(OrderedDict):
-    """
-    :type filename: str
-    :type path: str
-    :type bot: cloudbot.bot.CloudBot
-    """
-
-    def __init__(self, bot, *args, **kwargs):
-        """
-        :type bot: cloudbot.bot.CloudBot
-        :type args: list
-        :type kwargs: dict
-        """
-        super().__init__(*args, **kwargs)
-        self.filename = "config.json"
-        self.path = os.path.abspath(self.filename)
+    def __init__(
+        self, bot: "AbstractBot", *, filename: str = "config.json"
+    ) -> None:
+        super().__init__()
+        self.filename = filename
+        self.path = Path(self.filename).resolve()
         self.bot = bot
-        self.update(*args, **kwargs)
+
+        self._api_keys: dict[str, str | None] = {}
 
         # populate self with config data
         self.load_config()
 
-    def load_config(self):
+    def get_api_key(self, name: str, default: str | None = None) -> str | None:
+        try:
+            return self._api_keys[name]
+        except LookupError:
+            value = cast(
+                Optional[str], self.get("api_keys", {}).get(name, default)
+            )
+
+            self._api_keys[name] = value
+            return value
+
+    def load_config(self) -> None:
         """(re)loads the bot config from the config file"""
-        if not os.path.exists(self.path):
+        self._api_keys.clear()
+        if not self.path.exists():
             # if there is no config, show an error and die
             logger.critical("No config file found, bot shutting down!")
             print("No config file found! Bot shutting down in five seconds.")
             print("Copy 'config.default.json' to 'config.json' for defaults.")
-            print("For help, see http://git.io/cloudbotirc. Thank you for using CloudBot!")
+            print(
+                "For help, see htps://github.com/TotallyNotRobots/CloudBot. "
+                "Thank you for using CloudBot!"
+            )
             time.sleep(5)
             sys.exit()
 
-        with open(self.path) as f:
+        with self.path.open(encoding="utf-8") as f:
             data = json.load(f, object_pairs_hook=OrderedDict)
 
         self.update(data)
         logger.debug("Config loaded from file.")
 
-        # reload permissions
-        if self.bot.connections:
-            for connection in self.bot.connections.values():
-                connection.permissions.reload()
-
-    def save_config(self):
+    def save_config(self) -> None:
         """saves the contents of the config dict to the config file"""
-        with open(self.path, 'w') as f:
+        with self.path.open("w", encoding="utf-8") as f:
             json.dump(self, f, indent=4)
 
         logger.info("Config saved to file.")

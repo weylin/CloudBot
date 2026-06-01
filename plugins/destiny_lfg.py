@@ -1,3 +1,4 @@
+import asyncio
 from cloudbot import hook
 from ..plugins.destiny import chars
 from pickle import dump, load
@@ -45,7 +46,7 @@ def session_info(session):
 
 
 @hook.on_start()
-def load_data(bot):
+async def load_data(bot):
     """Load in our pickled content"""
     global SESSIONS, MEMBERS, SHERPAS, SESSION_COUNT
     try:
@@ -62,22 +63,22 @@ def load_data(bot):
 
 
 @hook.command('save_lfg', autohelp=False, permissions=["op"])
-def save_lfg(message):
+async def save_lfg(message):
     with open('destiny_lfg', 'wb') as f:
         dump([SESSIONS, MEMBERS, SHERPAS, SESSION_COUNT], f)
         message("Session information saved")
 
 
 # @hook.periodic(11, initial_interval=11)
-# def helper():
+# async def helper():
 #     # This function will take care of some of the maintenance
 #     # todo: remove old sessions
 
 
 @hook.command('lfg')
-def lfg(text, nick, bot, notice):
+async def lfg(text, nick, bot, notice):
     # Returns open groups. Can filter by console
-    for session in SESSIONS:
+    for session in SESSIONS.values():
         if len(session['members']) < int(session['limit']):
             if text:
                 if text == session['console']:
@@ -87,14 +88,14 @@ def lfg(text, nick, bot, notice):
 
 
 @hook.command('lfm')
-def lfm(text, nick, bot, notice):
+async def lfm(text, nick, bot, loop, notice):
     # Returns available players. Can filter by console
     for member in MEMBERS:
-        notice(chars(member, nick, bot, notice))
+        notice(await chars(member, nick, bot, loop, notice))
 
 
 @hook.command('sherpas')
-def sherpas(text, nick, bot, notice):
+async def sherpas(text, nick, bot, notice):
     # Returns a list of channel sherpas. Can filter by console
     args = text.lower().split(' ')
     if 'add' in args:
@@ -105,7 +106,8 @@ def sherpas(text, nick, bot, notice):
     elif 'remove' in args:
         for console in ['xb1', 'xb360', 'ps4', 'ps3']:
             if console in args:
-                if SHERPAS[console].get(nick, None):
+                if nick in SHERPAS[console]:
+                    SHERPAS[console].remove(nick)
                     notice('{} removed from {} list'.format(nick, console))
     else:
         for console in SHERPAS:
@@ -121,7 +123,7 @@ def sherpas(text, nick, bot, notice):
 
 
 @hook.command('newSession')
-def new_session(text, nick, bot):
+async def new_session(text, nick, bot):
     # Create a new session
     session = {
         'owner': nick,
@@ -146,7 +148,7 @@ def new_session(text, nick, bot):
 
 
 @hook.command('editSession')
-def edit_session(text, nick, bot, notice):
+async def edit_session(text, nick, bot, notice):
     # Edit an existing session
     args = parse_command(text)
     if 'id' not in args:
@@ -168,7 +170,7 @@ def edit_session(text, nick, bot, notice):
 
 
 @hook.command('deleteSession')
-def delete_session(text, nick, bot, notice):
+async def delete_session(text, nick, bot, notice):
     # Delete an existing session
     session = SESSIONS.get(text, None)
     if not session:
@@ -183,7 +185,7 @@ def delete_session(text, nick, bot, notice):
 
 
 @hook.command('sessions')
-def list_sessions(text, nick, bot, notice):
+async def list_sessions(text, nick, bot, notice):
     # List all upcoming sessions
     if text:
         session = SESSIONS.get(text, None)
@@ -193,12 +195,12 @@ def list_sessions(text, nick, bot, notice):
         else:
             notice(session_info(session))
     else:
-        for session in SESSIONS:
-            notice(session_info(SESSIONS[session]))
+        for session in SESSIONS.values():
+            notice(session_info(session))
 
 
 @hook.command('joinSession')
-def join_session(text, nick, bot, notice):
+async def join_session(text, nick, bot, notice):
     # Add a user to the session
     session = SESSIONS.get(text, None)
     if not session:
@@ -211,19 +213,19 @@ def join_session(text, nick, bot, notice):
 
 
 @hook.command('leaveSession')
-def leave_session(text, nick, bot, notice):
+async def leave_session(text, nick, bot, notice):
     # Remove the user from the session
     session = SESSIONS.get(text, None)
     if not session:
         notice('Could not find session with id of {}'.format(text))
         return
     if nick in session['members']:
-        del session['members']['nick']
+        session['members'].remove(nick)
         notice('You have been removed from session {}'.format(text))
 
 
 @hook.command('listme')
-def listme(nick, bot, notice):
+async def listme(nick, bot, notice):
     # Add a member to the list of those available
     if nick in MEMBERS:
         notice('You are already listed.')
@@ -234,17 +236,17 @@ def listme(nick, bot, notice):
 
 
 @hook.command('unlistme')
-def unlistme(text, nick, bot, notice):
+async def unlistme(text, nick, bot, notice):
     # Remove a member from the list of those available
     if nick in MEMBERS:
-        del MEMBERS[nick]
+        MEMBERS.remove(nick)
         notice('You have been removed from the list.')
     else:
         notice('You are not currently listed.')
 
 
 @hook.command('pingSession')
-def ping_session(text, bot, notice):
+async def ping_session(text, bot, notice):
     # Pings everyone in a session
     session = SESSIONS.get(text, None)
     if not session:
